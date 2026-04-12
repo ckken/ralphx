@@ -32,6 +32,8 @@ The result is a repeatable “keep going until the real task is done” workflow
 - `schemas/loop-output.schema.json`: strict response schema
 - `docs/methodology.md`: how the loop works
 - `docs/installation.md`: install and verify
+- `docs/architecture.md`: flowchart and runtime chain
+- `docs/zh-CN.md`: Chinese guide
 - `examples/`: task and checklist examples
 - `tasks/`: real task examples used during development
 
@@ -106,6 +108,8 @@ The method is documented in:
 
 - [docs/methodology.md](docs/methodology.md)
 - [docs/installation.md](docs/installation.md)
+- [docs/architecture.md](docs/architecture.md)
+- [docs/zh-CN.md](docs/zh-CN.md)
 
 Short version:
 
