@@ -3,7 +3,6 @@
 [English](README.md) | [中文](docs/zh/README.md)
 
 Quick links:
-- [Docs](docs/README.md)
 - [Installation](docs/en/installation.md)
 - [Methodology](docs/en/methodology.md)
 - [Flowcharts / Chain Diagram](docs/en/architecture.md)

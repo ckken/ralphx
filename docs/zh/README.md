@@ -104,11 +104,17 @@ codex-ralph \
   --workdir /path/to/repo
 ```
 
+## 文档索引
+
+- [安装说明](installation.md)
+- [方法论](methodology.md)
+- [架构与链路图](architecture.md)
+
 ## 推荐阅读顺序
 
 1. `README.md`
-2. `docs/installation.md`
-3. `docs/methodology.md`
-4. `docs/architecture.md`
+2. `docs/zh/installation.md`
+3. `docs/zh/methodology.md`
+4. `docs/zh/architecture.md`
 
 这样可以先装起来，再理解背后的控制逻辑。
