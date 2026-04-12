@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "exit_signal",
+    "files_modified",
+    "tests_passed",
+    "blockers",
+    "summary"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["in_progress", "blocked", "complete"]
+    },
+    "exit_signal": {
+      "type": "boolean"
+    },
+    "files_modified": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tests_passed": {
+      "type": "boolean"
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "summary": {
+      "type": "string"
+    }
+  }
+}
