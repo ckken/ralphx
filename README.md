@@ -1,5 +1,13 @@
 # codex-ralph
 
+[English](README.md) | [中文](docs/zh-CN.md)
+
+Quick links:
+- [Installation](docs/installation.md)
+- [Methodology](docs/methodology.md)
+- [Architecture / Flowcharts](docs/architecture.md)
+- [中文说明](docs/zh-CN.md)
+
 `codex-ralph` is a Bash orchestration layer for Codex.
 
 It turns Codex into a controlled outer-loop system:
