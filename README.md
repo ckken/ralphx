@@ -116,7 +116,6 @@ The method is documented in:
 - [docs/methodology.md](docs/methodology.md)
 - [docs/installation.md](docs/installation.md)
 - [docs/architecture.md](docs/architecture.md)
-- [docs/zh-CN.md](docs/zh-CN.md)
 
 Short version:
 
