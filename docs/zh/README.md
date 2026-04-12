@@ -1,78 +1,46 @@
-# codex-ralph 中文说明
+# codex-ralph
+
+[English](../../README.md) | [中文](README.md)
+
+快速入口：
+- [安装说明](installation.md)
+- [方法论](methodology.md)
+- [流程图 / 链路图](architecture.md)
 
 `codex-ralph` 是一个基于 Bash 的 Codex 外层控制器。
 
-它解决的问题不是“怎么调用一次 Codex”，而是“怎么让 Codex 在一个明确约束下持续推进，直到总任务真正完成”。
+它把 Codex 变成一个受控的外层循环系统：
 
-## 适合什么场景
+- 任务驱动
+- checklist gate
+- 验证优先
+- 抵抗过早完成
 
-- 多轮重构
-- 迁移任务
-- 需要验收门的自动推进
-- 不希望模型做完一个局部点就误判完成
+## 它解决什么问题
 
-## 核心方法论
+Codex 很容易在完成一个局部切片后过早宣布成功。`codex-ralph` 提供一个外层循环来：
 
-### 1. 总任务驱动
+- 读取任务文件
+- 可选读取 checklist
+- 以非交互方式调用 `codex exec`
+- 强制要求严格 JSON 输出
+- 在每轮成功后执行验证
+- 拒绝弱完成信号
 
-任务文件描述的是总目标，不是一个局部子任务。
+结果是一套可重复的“直到真实任务完成才停”的工作流。
 
-模型每轮都只能在这个总目标下推进，而不是自己随意缩窄范围。
+## 项目结构
 
-### 2. Checklist 作为硬门
-
-如果提供了 checklist：
-
-- 未勾选项 = 还没完成的硬任务
-- 即使模型返回 `complete`
-- 只要 checklist 还有未完成项，执行器就不会停
-
-### 3. Bash 外层掌控停止条件
-
-停止权不交给模型，而交给外层执行器。
-
-执行器负责：
-
-- 循环次数
-- 超时
-- Git 状态快照
-- 无进展判断
-- checklist gating
-- 验证命令执行
-
-### 4. 验证优先
-
-每一轮成功改动后，可以跑低成本验证链，例如：
-
-```bash
-bun src/index.ts --help
-bash scripts/verify-golden.sh --skip-build
-bash scripts/verify-batch.sh --skip-build
-```
-
-如果验证失败，就不能继续把这一轮当作有效进展。
-
-### 5. 防止“假完成”
-
-`codex-ralph` 会拒绝两类常见误停：
-
-1. 模型说完成了，但没有任何真实代码变化
-2. 模型说完成了，但 checklist 还有未完成项
-
-## 需要安装的内容
-
-必需：
-
-- `bash`
-- `jq`
-- `python3`
-- `codex`
-
-建议：
-
-- `git`
-- `gh`
-- `timeout` 或 `gtimeout`
+- `codex-loop.sh`：主执行器
+- `doctor.sh`：依赖和环境自检
+- `install.sh`：安装命令包装器到 `~/.local/bin`
+- `uninstall.sh`：移除已安装命令
+- `prompts/loop-system-prompt.md`：循环系统提示词
+- `schemas/loop-output.schema.json`：严格输出 schema
+- `docs/en/`：英文文档
+- `docs/zh/`：中文文档
+- `examples/`：任务与 checklist 示例
+- `tasks/`：项目开发中使用的真实任务示例
 
 ## 安装
 
@@ -83,19 +51,34 @@ cd codex-ralph
 codex-ralph-doctor
 ```
 
-如果命令找不到：
+如果需要：
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-## 最常见用法
+## 必需依赖
+
+- `bash`
+- `jq`
+- `python3`
+- `codex`
+
+建议安装：
+
+- `git`
+- `gh`
+- `timeout` 或 `gtimeout`
+
+## 快速开始
+
+使用任务文件：
 
 ```bash
 codex-ralph --task ./examples/sample-task.md --workdir /path/to/repo
 ```
 
-带 checklist：
+显式指定 checklist：
 
 ```bash
 codex-ralph \
@@ -104,17 +87,58 @@ codex-ralph \
   --workdir /path/to/repo
 ```
 
-## 文档索引
+## 运行参数
 
-- [安装说明](installation.md)
+常用环境变量：
+
+```bash
+export CODEX_CMD=codex
+export CODEX_ARGS='-m gpt-5.4-mini'
+export TESTS_CMD='bun src/index.ts --help && bash scripts/verify-golden.sh --skip-build'
+export MAX_ITERATIONS=0
+export MAX_NO_PROGRESS=0
+export ROUND_TIMEOUT_SECONDS=1800
+```
+
+含义：
+
+- `MAX_ITERATIONS=0`：不设迭代上限
+- `MAX_NO_PROGRESS=0`：不设无进展停止阈值
+- `CHECKLIST_FILE`：强制指定 checklist 路径
+- `TESTS_CMD`：每轮成功后执行的验证链
+
+## 方法
+
+相关文档：
+
 - [方法论](methodology.md)
-- [架构与链路图](architecture.md)
+- [安装说明](installation.md)
+- [流程图 / 链路图](architecture.md)
 
-## 推荐阅读顺序
+简版方法：
 
-1. `README.md`
-2. `docs/zh/installation.md`
-3. `docs/zh/methodology.md`
-4. `docs/zh/architecture.md`
+1. Codex 负责局部实现
+2. Bash 负责外层控制循环
+3. Checklist 未完成项视为硬剩余工作
+4. 验证 gate 用于阻止坏进展
+5. 只有总任务真正完成时才接受完成
 
-这样可以先装起来，再理解背后的控制逻辑。
+## 输出契约
+
+每一轮 Codex 必须返回一个 JSON 对象：
+
+```json
+{
+  "status": "in_progress|blocked|complete",
+  "exit_signal": true,
+  "files_modified": 0,
+  "tests_passed": false,
+  "blockers": [],
+  "summary": ""
+}
+```
+
+## 已安装命令
+
+- `codex-ralph`
+- `codex-ralph-doctor`
