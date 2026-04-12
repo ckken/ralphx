@@ -5,8 +5,7 @@
 Quick links:
 - [Installation](docs/installation.md)
 - [Methodology](docs/methodology.md)
-- [Architecture / Flowcharts](docs/architecture.md)
-- [中文说明](docs/zh-CN.md)
+- [Flowcharts / Chain Diagram](docs/architecture.md)
 
 `codex-ralph` is a Bash orchestration layer for Codex.
 
