@@ -1,11 +1,12 @@
 # codex-ralph
 
-[English](README.md) | [中文](docs/zh-CN.md)
+[English](README.md) | [中文](docs/zh/README.md)
 
 Quick links:
-- [Installation](docs/installation.md)
-- [Methodology](docs/methodology.md)
-- [Flowcharts / Chain Diagram](docs/architecture.md)
+- [Docs](docs/README.md)
+- [Installation](docs/en/installation.md)
+- [Methodology](docs/en/methodology.md)
+- [Flowcharts / Chain Diagram](docs/en/architecture.md)
 
 `codex-ralph` is a Bash orchestration layer for Codex.
 
@@ -37,10 +38,8 @@ The result is a repeatable “keep going until the real task is done” workflow
 - `uninstall.sh`: remove installed wrappers
 - `prompts/loop-system-prompt.md`: system prompt for the loop
 - `schemas/loop-output.schema.json`: strict response schema
-- `docs/methodology.md`: how the loop works
-- `docs/installation.md`: install and verify
-- `docs/architecture.md`: flowchart and runtime chain
-- `docs/zh-CN.md`: Chinese guide
+- `docs/en/`: English docs
+- `docs/zh/`: Chinese docs
 - `examples/`: task and checklist examples
 - `tasks/`: real task examples used during development
 
@@ -113,9 +112,9 @@ Meaning:
 
 The method is documented in:
 
-- [docs/methodology.md](docs/methodology.md)
-- [docs/installation.md](docs/installation.md)
-- [docs/architecture.md](docs/architecture.md)
+- [docs/en/methodology.md](docs/en/methodology.md)
+- [docs/en/installation.md](docs/en/installation.md)
+- [docs/en/architecture.md](docs/en/architecture.md)
 
 Short version:
 
