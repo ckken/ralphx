@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ckken/ralphx/internal/config"
+	"github.com/ckken/ralphx/internal/current"
 	"github.com/ckken/ralphx/internal/doctor"
 	"github.com/ckken/ralphx/internal/runner"
 	"github.com/ckken/ralphx/internal/version"
@@ -26,6 +27,8 @@ func Main(args []string) int {
 	case "version":
 		fmt.Println(version.String())
 		return 0
+	case "current":
+		return current.Main(os.Stdout)
 	case "doctor":
 		return doctor.Run(os.Stdout)
 	case "run":
@@ -65,7 +68,7 @@ func normalizeCommand(args []string) (string, []string) {
 	}
 	first := args[0]
 	switch first {
-	case "run", "doctor", "version", "help", "-h", "--help":
+	case "run", "doctor", "version", "current", "help", "-h", "--help":
 		return first, args[1:]
 	default:
 		if strings.HasPrefix(first, "-") {
@@ -82,6 +85,7 @@ func printUsage() {
 	fmt.Println("  ralphx run --task FILE [--checklist FILE] [--workdir DIR]")
 	fmt.Println("  ralphx doctor")
 	fmt.Println("  ralphx version")
+	fmt.Println("  ralphx current")
 	fmt.Println()
 	fmt.Println("Compatibility:")
 	fmt.Println("  ralphx --task FILE ...      same as: ralphx run --task FILE ...")
