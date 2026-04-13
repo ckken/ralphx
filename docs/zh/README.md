@@ -1,54 +1,38 @@
-# codex-ralph
+# ralphx
 
 [English](../../README.md) | [中文](README.md)
 
 快速入口：
 - [安装说明](installation.md)
 - [方法论](methodology.md)
+- [生产 SOP](production-sop.md)
+- [并行协议 v0](../en/go-parallel-protocol-v0.md)
 - [流程图 / 链路图](architecture.md)
 
-`codex-ralph` 是一个基于 Bash 的 Codex 外层控制器。
+`ralphx` 是一个基于 Go 的 Codex / coding agent 外层执行器。
 
-它把 Codex 变成一个受控的外层循环系统：
+核心目标很简单：
+- 让 agent 用当前工具持续推进，直到真实任务完成
+- 用 checklist / validation / leader gate 阻止过早完成
+- 在任务可拆分时支持本地多 worker 并行执行
 
-- 任务驱动
-- checklist gate
-- 验证优先
-- 抵抗过早完成
-
-## 它解决什么问题
-
-Codex 很容易在完成一个局部切片后过早宣布成功。`codex-ralph` 提供一个外层循环来：
+## 它现在能做什么
 
 - 读取任务文件
 - 可选读取 checklist
-- 以非交互方式调用 `codex exec`
-- 强制要求严格 JSON 输出
-- 在每轮成功后执行验证
+- 调用 `codex exec` 并要求严格 JSON 输出
+- 把运行状态落到 `.ralphx/`
 - 拒绝弱完成信号
-
-结果是一套可重复的“直到真实任务完成才停”的工作流。
-
-## 项目结构
-
-- `codex-loop.sh`：主执行器
-- `doctor.sh`：依赖和环境自检
-- `install.sh`：安装命令包装器到 `~/.local/bin`
-- `uninstall.sh`：移除已安装命令
-- `prompts/loop-system-prompt.md`：循环系统提示词
-- `schemas/loop-output.schema.json`：严格输出 schema
-- `docs/en/`：英文文档
-- `docs/zh/`：中文文档
-- `examples/`：任务与 checklist 示例
-- `tasks/`：项目开发中使用的真实任务示例
+- 执行验证命令
+- 用 `--workers N` 把 checklist 项拆成并行 worker 任务
 
 ## 安装
 
 ```bash
-git clone https://github.com/ckken/codex-ralph.git
-cd codex-ralph
+git clone https://github.com/ckken/ralphx.git
+cd ralphx
 ./install.sh
-codex-ralph-doctor
+ralphx-doctor
 ```
 
 如果需要：
@@ -57,88 +41,60 @@ codex-ralph-doctor
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-## 必需依赖
+## 依赖
 
-- `bash`
-- `jq`
-- `python3`
+必需：
+- `go`
 - `codex`
 
-建议安装：
-
+建议：
 - `git`
 - `gh`
-- `timeout` 或 `gtimeout`
+- `bash`
+- `python3`
+
+可选：
+- `jq`（仅 legacy 辅助；Go 主链路不依赖）
 
 ## 快速开始
 
-使用任务文件：
+单 worker：
 
 ```bash
-codex-ralph --task ./examples/sample-task.md --workdir /path/to/repo
+ralphx --task ./examples/sample-task.md --workdir /path/to/repo
 ```
 
 显式指定 checklist：
 
 ```bash
-codex-ralph \
-  --task ./examples/sample-task.md \
-  --checklist ./examples/sample-task.checklist.md \
-  --workdir /path/to/repo
+ralphx   --task ./examples/sample-task.md   --checklist ./examples/sample-task.checklist.md   --workdir /path/to/repo
 ```
 
-## 运行参数
+并行 checklist：
 
-常用环境变量：
+```bash
+ralphx   --task ./examples/sample-task.md   --checklist ./examples/sample-task.checklist.md   --workdir /path/to/repo   --workers 3
+```
+
+## 常用环境变量
 
 ```bash
 export CODEX_CMD=codex
-export CODEX_ARGS='-m gpt-5.4-mini'
-export TESTS_CMD='bun src/index.ts --help && bash scripts/verify-golden.sh --skip-build'
+export CODEX_ARGS='-m gpt-5.4'
+export TESTS_CMD='go test ./...'
 export MAX_ITERATIONS=0
 export MAX_NO_PROGRESS=0
 export ROUND_TIMEOUT_SECONDS=1800
+export RALPHX_WORKERS=3
 ```
 
-含义：
+## 生产建议
 
-- `MAX_ITERATIONS=0`：不设迭代上限
-- `MAX_NO_PROGRESS=0`：不设无进展停止阈值
-- `CHECKLIST_FILE`：强制指定 checklist 路径
-- `TESTS_CMD`：每轮成功后执行的验证链
+1. 先跑 `ralphx-doctor`
+2. 准备 task + checklist
+3. 默认先用 `--workers 1`
+4. checklist 明确可拆时再开并行
+5. 配置 `TESTS_CMD`
+6. 运行后检查 `.ralphx/last-result.json`、`.ralphx/state.json`、`.ralphx/results/`
 
-## 方法
-
-相关文档：
-
-- [方法论](methodology.md)
-- [安装说明](installation.md)
-- [流程图 / 链路图](architecture.md)
-
-简版方法：
-
-1. Codex 负责局部实现
-2. Bash 负责外层控制循环
-3. Checklist 未完成项视为硬剩余工作
-4. 验证 gate 用于阻止坏进展
-5. 只有总任务真正完成时才接受完成
-
-## 输出契约
-
-每一轮 Codex 必须返回一个 JSON 对象：
-
-```json
-{
-  "status": "in_progress|blocked|complete",
-  "exit_signal": true,
-  "files_modified": 0,
-  "tests_passed": false,
-  "blockers": [],
-  "summary": ""
-}
-```
-
-## 已安装命令
-
-- `codex-ralph`
-- `codex-ralph-doctor`
+完整操作请看：[生产 SOP](production-sop.md)

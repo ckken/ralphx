@@ -2,28 +2,30 @@
 
 ## 必需工具
 
-- `bash`
-- `jq`
-- `python3`
+必需：
+- `go`
 - `codex`
 
-## 建议工具
-
+建议：
 - `git`
 - `gh`
-- `timeout` 或 `gtimeout`
+- `bash`
+- `python3`
 
-## 安装
+可选：
+- `jq`（仅 legacy 辅助；Go 主链路不依赖）
+
+## 从源码安装
 
 ```bash
-git clone https://github.com/ckken/codex-ralph.git
-cd codex-ralph
+git clone https://github.com/ckken/ralphx.git
+cd ralphx
 ./install.sh
 ```
 
 默认会把命令安装到 `~/.local/bin`。
 
-如果 shell 找不到 `codex-ralph`，加入：
+如果 shell 找不到 `ralphx`，加入：
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
@@ -32,8 +34,15 @@ export PATH="$HOME/.local/bin:$PATH"
 ## 验证
 
 ```bash
-codex-ralph-doctor
-codex-ralph --help
+ralphx-doctor
+ralphx --help
+ralphx version
+```
+
+## 自定义安装目录
+
+```bash
+PREFIX=/custom/bin ./install.sh
 ```
 
 ## 卸载

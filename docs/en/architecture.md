@@ -1,12 +1,12 @@
 # Architecture
 
-This document explains the runtime flow of `codex-ralph` with a process diagram and a component chain diagram.
+This document explains the runtime flow of `ralphx` with a process diagram and a component chain diagram.
 
 ## Process Flow
 
 ```mermaid
 flowchart TD
-    A[Start codex-ralph] --> B[Load task file]
+    A[Start ralphx] --> B[Load task file]
     B --> C{Checklist file exists?}
     C -- yes --> D[Load checklist and count open items]
     C -- no --> E[Continue without checklist]
@@ -42,7 +42,7 @@ flowchart TD
 flowchart LR
     User[User] --> Task[Task file]
     User --> Checklist[Checklist file]
-    Task --> Loop[codex-loop.sh]
+    Task --> Loop[ralphx-loop.sh]
     Checklist --> Loop
     Prompt[loop-system-prompt.md] --> Loop
     Schema[loop-output.schema.json] --> Loop
@@ -50,7 +50,7 @@ flowchart LR
     Codex --> Json[Strict JSON result]
     Json --> Gate[Completion gates]
     Gate --> Validate[Validation chain]
-    Validate --> State[.codex-ralph state files]
+    Validate --> State[.ralphx state files]
     State --> Loop
     Gate --> Stop[Stop only when total task is done]
 ```

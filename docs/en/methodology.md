@@ -1,58 +1,59 @@
 # Methodology
 
-`codex-ralph` is a Bash orchestration layer for Codex. The method is simple:
+`ralphx` is a Go-based outer-loop runner for Codex and coding agents.
+
+Its method is simple:
 
 1. Treat the task file as the source of truth.
-2. Call Codex in non-interactive mode.
-3. Require a strict JSON result.
-4. Refuse to stop on weak completion signals.
-5. Run validation between iterations.
-6. Continue until the real task is done or a true blocker appears.
+2. Optionally attach a checklist and treat unchecked items as hard remaining work.
+3. Invoke the agent with a strict JSON result contract.
+4. Persist local runtime state under `.ralphx/`.
+5. Reject premature completion on the leader side.
+6. Run validation between iterations when configured.
+7. In parallel mode, let workers execute bounded checklist slices while the leader remains the only authority for total completion.
 
 ## Core principles
 
 ### 1. Outer-loop control
 
-The model does not decide alone when work is complete. The Bash loop owns:
-
+The agent does not decide alone when the work is complete. `ralphx` owns:
 - iteration count
 - timeout
-- validation
-- no-progress detection
 - checklist gating
+- no-progress detection
+- validation
+- final completion acceptance
 
 ### 2. Checklist gating
 
-A markdown checklist can be attached to the task. Any unchecked item is treated as hard remaining work.
+Unchecked checklist items are treated as real remaining work.
 
 That means:
-
 - a local slice can finish without ending the total task
 - `complete` is rejected while checklist items remain
+- in parallel mode, workers can finish slices but only the leader can end the run
 
 ### 3. Validation-first progression
 
-Each loop can run a low-cost validation chain before moving on.
+Use `TESTS_CMD` to keep progress honest.
 
 Typical validation:
-
+- `go test ./...`
 - `bun src/index.ts --help`
 - `bash scripts/verify-golden.sh --skip-build`
-- `bash scripts/verify-batch.sh --skip-build`
 
 ### 4. Premature-complete defense
 
-`codex-ralph` rejects completion when:
+`ralphx` rejects completion when:
+- the agent returns `complete`
+- but no meaningful progress exists, or
+- checklist items still remain
 
-- Codex returns `complete`
-- but no new changes were actually made
+### 5. Parallel mode discipline
 
-This avoids the common failure mode where the model “concludes” instead of progressing.
+Parallel mode is for bounded checklist decomposition, not unconstrained swarming.
 
-## Recommended workflow
-
-1. Write a total-task file.
-2. Add a checklist if the task spans multiple milestones.
-3. Attach the lowest-cost useful validation command chain.
-4. Let the loop run.
-5. Only accept final completion when the checklist is empty and validation is green.
+Use `--workers N` only when:
+- checklist items are separable
+- items do not require conflicting writes
+- the leader can aggregate results and run final validation

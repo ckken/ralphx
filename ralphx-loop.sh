@@ -15,7 +15,7 @@ ROUND_TIMEOUT_SECONDS="${ROUND_TIMEOUT_SECONDS:-1800}"
 CODEX_ARGS="${CODEX_ARGS:-}"
 TESTS_CMD="${TESTS_CMD:-}"
 WORKDIR="${WORKDIR:-$ROOT_DIR}"
-STATE_DIR="${STATE_DIR:-$WORKDIR/.codex-ralph}"
+STATE_DIR="${STATE_DIR:-$WORKDIR/.ralphx}"
 LOG_DIR="$STATE_DIR/logs"
 STATE_FILE="$STATE_DIR/state.json"
 LAST_OUTPUT_FILE="$STATE_DIR/last-output.txt"
@@ -28,7 +28,7 @@ mkdir -p "$STATE_DIR" "$LOG_DIR"
 usage() {
   cat <<'EOF'
 Usage:
-  codex-loop.sh --task FILE [--checklist FILE] [--workdir DIR]
+  ralphx-loop.sh --task FILE [--checklist FILE] [--workdir DIR]
 
 Environment:
   CODEX_CMD            Codex CLI command, default: codex
@@ -340,7 +340,7 @@ main() {
         ;;
       --workdir)
         WORKDIR="${2:-}"
-        STATE_DIR="$WORKDIR/.codex-ralph"
+        STATE_DIR="$WORKDIR/.ralphx"
         LOG_DIR="$STATE_DIR/logs"
         STATE_FILE="$STATE_DIR/state.json"
         LAST_OUTPUT_FILE="$STATE_DIR/last-output.txt"

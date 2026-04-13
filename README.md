@@ -1,54 +1,53 @@
-# codex-ralph
+# ralphx
 
 [English](README.md) | [中文](docs/zh/README.md)
 
 Quick links:
 - [Installation](docs/en/installation.md)
 - [Methodology](docs/en/methodology.md)
+- [Production SOP](docs/en/production-sop.md)
+- [Parallel protocol v0](docs/en/go-parallel-protocol-v0.md)
 - [Flowcharts / Chain Diagram](docs/en/architecture.md)
 
-`codex-ralph` is a Bash orchestration layer for Codex.
+`ralphx` is a Go-based outer-loop runner for Codex and coding agents.
 
-It turns Codex into a controlled outer-loop system:
+It is designed for one core goal:
+- let the agent keep working with the current tools until the real task is done
+- keep completion gated by checklist / validation / leader-side rules
+- support local multi-worker execution when the task is checklist-decomposable
 
-- task-driven
-- checklist-gated
-- validation-first
-- resistant to premature completion
+## What it does
 
-## What problem it solves
+`ralphx` gives you a local-first execution loop that can:
+- read a task file
+- optionally read a checklist
+- invoke `codex exec` with a strict JSON contract
+- persist run state under `.ralphx/`
+- reject premature completion
+- run validation commands
+- split checklist items into parallel worker jobs with `--workers N`
 
-Codex can implement a slice and then declare success too early. `codex-ralph` adds an outer loop that:
+## Current shape
 
-- reads a task file
-- optionally reads a checklist
-- calls `codex exec` non-interactively
-- requires strict JSON output
-- validates each successful round
-- refuses weak completion
+Production-relevant surfaces:
+- `ralphx`: main CLI
+- `ralphx-doctor`: environment/self-check command
+- `install.sh`: build + install wrappers into `~/.local/bin`
+- `.ralphx/`: local runtime state, logs, results, runtime schema
 
-The result is a repeatable “keep going until the real task is done” workflow.
-
-## Project layout
-
-- `codex-loop.sh`: main executor
-- `doctor.sh`: dependency and environment check
-- `install.sh`: install command wrappers into `~/.local/bin`
-- `uninstall.sh`: remove installed wrappers
-- `prompts/loop-system-prompt.md`: system prompt for the loop
-- `schemas/loop-output.schema.json`: strict response schema
-- `docs/en/`: English docs
-- `docs/zh/`: Chinese docs
-- `examples/`: task and checklist examples
-- `tasks/`: real task examples used during development
+Key runtime behavior:
+- single-run mode works with `--workers 1` (default)
+- checklist-driven parallel mode works with `--workers N`
+- leader owns overall completion
+- worker results are advisory; final completion is leader-gated
 
 ## Install
 
 ```bash
-git clone https://github.com/ckken/codex-ralph.git
-cd codex-ralph
+git clone https://github.com/ckken/ralphx.git
+cd ralphx
 ./install.sh
-codex-ralph-doctor
+ralphx-doctor
 ```
 
 If needed:
@@ -57,75 +56,76 @@ If needed:
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-## Required dependencies
+## Runtime dependencies
 
-- `bash`
-- `jq`
-- `python3`
+Required:
+- `go` (for local build/install from source)
 - `codex`
 
 Recommended:
-
 - `git`
 - `gh`
-- `timeout` or `gtimeout`
+- `bash`
+- `python3`
+
+Optional:
+- `jq` (legacy-only helper; not required by the Go-native main path)
 
 ## Quick start
 
-Run with a task file:
+Run a single-worker task:
 
 ```bash
-codex-ralph --task ./examples/sample-task.md --workdir /path/to/repo
+ralphx --task ./examples/sample-task.md --workdir /path/to/repo
 ```
 
 Run with an explicit checklist:
 
 ```bash
-codex-ralph \
-  --task ./examples/sample-task.md \
-  --checklist ./examples/sample-task.checklist.md \
-  --workdir /path/to/repo
+ralphx   --task ./examples/sample-task.md   --checklist ./examples/sample-task.checklist.md   --workdir /path/to/repo
 ```
 
-## Runtime controls
+Run checklist items in parallel:
 
-Common environment variables:
+```bash
+ralphx   --task ./examples/sample-task.md   --checklist ./examples/sample-task.checklist.md   --workdir /path/to/repo   --workers 3
+```
+
+## Common environment variables
 
 ```bash
 export CODEX_CMD=codex
-export CODEX_ARGS='-m gpt-5.4-mini'
-export TESTS_CMD='bun src/index.ts --help && bash scripts/verify-golden.sh --skip-build'
+export CODEX_ARGS='-m gpt-5.4'
+export TESTS_CMD='go test ./...'
 export MAX_ITERATIONS=0
 export MAX_NO_PROGRESS=0
 export ROUND_TIMEOUT_SECONDS=1800
+export RALPHX_WORKERS=3
 ```
 
 Meaning:
-
+- `CODEX_CMD`: agent executable to invoke
+- `CODEX_ARGS`: extra args passed to the agent
+- `TESTS_CMD`: post-round validation command
 - `MAX_ITERATIONS=0`: no hard iteration cap
 - `MAX_NO_PROGRESS=0`: no no-progress stop gate
-- `CHECKLIST_FILE`: force a checklist file path
-- `TESTS_CMD`: validation chain to run after successful rounds
+- `ROUND_TIMEOUT_SECONDS`: per-round timeout in seconds
+- `RALPHX_WORKERS`: default worker count for parallel mode
 
-## Method
+## Recommended production path
 
-The method is documented in:
+1. Run `ralphx-doctor`
+2. Prepare a task file and checklist
+3. Start with `--workers 1` unless the checklist items are clearly independent
+4. Use `--workers N` only when checklist items are bounded and separable
+5. Set `TESTS_CMD` so every successful round is validated
+6. Review `.ralphx/last-result.json`, `.ralphx/state.json`, and `.ralphx/results/` after runs
 
-- [docs/en/methodology.md](docs/en/methodology.md)
-- [docs/en/installation.md](docs/en/installation.md)
-- [docs/en/architecture.md](docs/en/architecture.md)
-
-Short version:
-
-1. Codex does the local work.
-2. Bash owns the control loop.
-3. Checklist items are hard remaining work.
-4. Validation gates stop bad progress.
-5. Completion is accepted only when the total objective is truly done.
+See the full rollout guide in [Production SOP](docs/en/production-sop.md).
 
 ## Output contract
 
-Each Codex round must return one JSON object:
+Each agent round must return one JSON object:
 
 ```json
 {
@@ -140,5 +140,5 @@ Each Codex round must return one JSON object:
 
 ## Installed commands
 
-- `codex-ralph`
-- `codex-ralph-doctor`
+- `ralphx`
+- `ralphx-doctor`

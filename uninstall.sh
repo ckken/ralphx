@@ -4,11 +4,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_BIN_DIR="${HOME}/.local/bin"
 BIN_DIR="${PREFIX:-$DEFAULT_BIN_DIR}"
-COMMAND_NAME="codex-ralph"
-TARGET_SCRIPT="$SCRIPT_DIR/codex-loop.sh"
+BUILD_DIR="$SCRIPT_DIR/bin"
+COMMAND_NAME="ralphx"
+DOCTOR_NAME="ralphx-doctor"
+TARGET_BINARY="$BUILD_DIR/$COMMAND_NAME"
+DOCTOR_BINARY="$BUILD_DIR/$DOCTOR_NAME"
 INSTALL_PATH="$BIN_DIR/$COMMAND_NAME"
-DOCTOR_NAME="codex-ralph-doctor"
-DOCTOR_SCRIPT="$SCRIPT_DIR/doctor.sh"
 DOCTOR_INSTALL_PATH="$BIN_DIR/$DOCTOR_NAME"
 
 die() {
@@ -20,37 +21,31 @@ info() {
   printf '[uninstall] %s\n' "$*"
 }
 
+remove_wrapper() {
+  local install_path="$1"
+  local target_binary="$2"
+
+  if [[ -L "$install_path" ]]; then
+    rm -f "$install_path"
+    info "Removed symlink: $install_path"
+    return 0
+  fi
+
+  if [[ -f "$install_path" ]]; then
+    if grep -qF "$target_binary" "$install_path" 2>/dev/null; then
+      rm -f "$install_path"
+      info "Removed wrapper: $install_path"
+      return 0
+    fi
+    die "Refusing to remove non-ralphx file: $install_path"
+  fi
+
+  info "Nothing to uninstall: $install_path"
+}
+
 main() {
-  for pair in \
-    "$INSTALL_PATH:$TARGET_SCRIPT" \
-    "$DOCTOR_INSTALL_PATH:$DOCTOR_SCRIPT"
-  do
-    local install_path="${pair%%:*}"
-    local target_script="${pair##*:}"
-
-    if [[ -L "$install_path" ]]; then
-      local linked
-      linked="$(readlink "$install_path")"
-      if [[ "$linked" == "$target_script" ]]; then
-        rm -f "$install_path"
-        info "Removed wrapper: $install_path"
-        continue
-      fi
-      die "Refusing to remove symlink that points elsewhere: $install_path -> $linked"
-    fi
-
-    if [[ -f "$install_path" ]]; then
-      if grep -qF "$target_script" "$install_path" 2>/dev/null; then
-        rm -f "$install_path"
-        info "Removed wrapper: $install_path"
-        continue
-      fi
-
-      die "Refusing to remove non-codex-ralph file: $install_path"
-    fi
-
-    info "Nothing to uninstall: $install_path"
-  done
+  remove_wrapper "$INSTALL_PATH" "$TARGET_BINARY"
+  remove_wrapper "$DOCTOR_INSTALL_PATH" "$DOCTOR_BINARY"
 }
 
 main "$@"

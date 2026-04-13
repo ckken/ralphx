@@ -1,12 +1,12 @@
 # 架构与链路图
 
-本文说明 `codex-ralph` 的运行流程图和组件链路图。
+本文说明 `ralphx` 的运行流程图和组件链路图。
 
 ## 流程图
 
 ```mermaid
 flowchart TD
-    A[启动 codex-ralph] --> B[读取任务文件]
+    A[启动 ralphx] --> B[读取任务文件]
     B --> C{是否存在 checklist}
     C -- 是 --> D[读取 checklist 并统计未完成项]
     C -- 否 --> E[无 checklist 继续]
@@ -42,7 +42,7 @@ flowchart TD
 flowchart LR
     User[用户] --> Task[任务文件]
     User --> Checklist[checklist 文件]
-    Task --> Loop[codex-loop.sh]
+    Task --> Loop[ralphx-loop.sh]
     Checklist --> Loop
     Prompt[loop-system-prompt.md] --> Loop
     Schema[loop-output.schema.json] --> Loop
@@ -50,7 +50,7 @@ flowchart LR
     Codex --> Json[严格 JSON 结果]
     Json --> Gate[完成条件 gate]
     Gate --> Validate[验证链]
-    Validate --> State[.codex-ralph 状态文件]
+    Validate --> State[.ralphx 状态文件]
     State --> Loop
     Gate --> Stop[只有总任务完成才停止]
 ```

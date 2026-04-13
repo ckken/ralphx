@@ -2,28 +2,30 @@
 
 ## Required tools
 
-- `bash`
-- `jq`
-- `python3`
+Required:
+- `go`
 - `codex`
 
-## Recommended tools
-
+Recommended:
 - `git`
 - `gh`
-- `timeout` or `gtimeout`
+- `bash`
+- `python3`
 
-## Install
+Optional:
+- `jq` (legacy-only helper; not required by the Go-native main path)
+
+## Install from source
 
 ```bash
-git clone https://github.com/ckken/codex-ralph.git
-cd codex-ralph
+git clone https://github.com/ckken/ralphx.git
+cd ralphx
 ./install.sh
 ```
 
-By default the command is installed into `~/.local/bin`.
+By default the commands are installed into `~/.local/bin`.
 
-If your shell cannot find `codex-ralph`, add:
+If your shell cannot find `ralphx`, add:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
@@ -32,8 +34,15 @@ export PATH="$HOME/.local/bin:$PATH"
 ## Verify
 
 ```bash
-codex-ralph-doctor
-codex-ralph --help
+ralphx-doctor
+ralphx --help
+ralphx version
+```
+
+## Install to a custom prefix
+
+```bash
+PREFIX=/custom/bin ./install.sh
 ```
 
 ## Uninstall

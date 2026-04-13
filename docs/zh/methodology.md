@@ -1,57 +1,45 @@
 # 方法论
 
-`codex-ralph` 是一个基于 Bash 的 Codex 外层控制器。它的方法可以概括为：
+`ralphx` 是一个基于 Go 的 Codex / coding agent 外层执行器。
 
-1. 任务文件作为唯一目标源
-2. 使用非交互模式调用 Codex
-3. 强制要求严格 JSON 返回
-4. 拒绝弱完成信号
-5. 每轮之间跑验证
-6. 直到真实任务完成或出现真实阻塞才停止
+核心方法：
+
+1. task file 是总目标真源。
+2. checklist 未完成项视为硬剩余工作。
+3. agent 必须返回严格 JSON 结果。
+4. 运行状态落到 `.ralphx/`。
+5. 由 leader 侧拒绝过早完成。
+6. 配置了 `TESTS_CMD` 时，每轮进展后执行验证。
+7. 并行模式下，worker 只负责局部 slice，总完成只能由 leader 判定。
 
 ## 核心原则
 
-### 1. 外层控制
+### 1. 外层控制权
 
-是否完成，不由模型单独决定，而由 Bash 外层循环控制：
-
-- 循环次数
+不是 agent 自己决定什么时候完成，`ralphx` 控制：
+- 迭代次数
 - 超时
-- 验证
-- 无进展判断
 - checklist gate
+- no-progress stop
+- validation
+- 最终完成接受
 
-### 2. Checklist 硬门
+### 2. Checklist gate
 
-如果附带 markdown checklist：
+只要 checklist 还有未完成项：
+- 单个 slice 做完不代表总任务完成
+- `complete` 会被拒绝
+- 并行 worker 做完局部也不能直接结束总任务
 
-- 任何未勾选项都代表剩余硬任务
-- 即使局部切片完成，也不能结束总任务
-- 只要 checklist 未清空，就拒绝 `complete`
+### 3. Validation-first
 
-### 3. 验证优先
+建议总是配置 `TESTS_CMD`。
 
-每一轮可以挂低成本验证链，再决定是否继续。
+例如：
+- `go test ./...`
+- `bun test && bun run lint`
+- `pytest -q`
 
-典型验证：
+### 4. Parallel mode discipline
 
-- `bun src/index.ts --help`
-- `bash scripts/verify-golden.sh --skip-build`
-- `bash scripts/verify-batch.sh --skip-build`
-
-### 4. 防止过早完成
-
-`codex-ralph` 会拒绝这类错误停止：
-
-- Codex 返回 `complete`
-- 但实际上没有新的代码改动
-
-这能防止模型“总结了”却没有真正推进。
-
-## 推荐工作流
-
-1. 先写总任务文件
-2. 如果任务跨多个里程碑，再配 checklist
-3. 绑定最低成本但足够有用的验证链
-4. 启动循环
-5. 只有 checklist 清空且验证通过时，才接受最终完成
+并行模式适合“边界清晰的 checklist 拆分”，不适合无边界乱 swarm。
