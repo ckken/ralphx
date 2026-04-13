@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "title",
+    "task_markdown",
+    "checklist",
+    "tests_cmd"
+  ],
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_markdown": {
+      "type": "string",
+      "minLength": 1
+    },
+    "checklist": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "tests_cmd": {
+      "type": "string"
+    }
+  }
+}

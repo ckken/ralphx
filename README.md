@@ -65,3 +65,21 @@ Inspect the active persisted execution state:
 ```bash
 ralphx current
 ```
+
+Create a task and checklist from a goal:
+
+```bash
+ralphx plan --goal "finish the current migration batch" --out tasks/migration.md
+```
+
+Regenerate the next task/checklist from current state:
+
+```bash
+ralphx replan --task tasks/migration.md
+```
+
+Resume the previous Codex session when it is still fresh:
+
+```bash
+ralphx run --task tasks/migration.md --resume --session-expiry 24h
+```

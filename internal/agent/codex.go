@@ -26,28 +26,61 @@ func NewCodex(command string) CodexAgent {
 func (a CodexAgent) Run(ctx context.Context, req Request) (Response, error) {
 	args := append([]string{}, req.ExtraArgs...)
 	if a.Command == "codex" {
-		args = append([]string{"exec", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox", "-C", req.Workdir, "--output-schema", req.OutputSchemaPath, "-o", req.RawLogPath, "-"}, args...)
+		if strings.TrimSpace(req.SessionID) != "" {
+			args = append([]string{"exec", "resume", req.SessionID, "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox", "--json", "-"}, args...)
+		} else {
+			args = append([]string{"exec", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox", "-C", req.Workdir, "--json", "--output-schema", req.OutputSchemaPath, "-"}, args...)
+		}
 	}
 	res, err := execx.Run(ctx, a.Command, args, []byte(req.Prompt), req.Workdir)
 	raw := res.Output
 	if req.RawLogPath != "" {
-		if data, readErr := os.ReadFile(req.RawLogPath); readErr == nil && len(data) > 0 {
-			raw = data
-		} else if len(raw) > 0 {
-			_ = os.WriteFile(req.RawLogPath, raw, 0o644)
-		}
+		_ = os.WriteFile(req.RawLogPath, raw, 0o644)
 	}
-	parsed, parseErr := ExtractRoundResult(raw)
+	messageText, sessionID := extractAgentMessageAndSession(raw)
+	if sessionID == "" {
+		sessionID = strings.TrimSpace(req.SessionID)
+	}
+	parsed, parseErr := ExtractRoundResult([]byte(messageText))
 	if parseErr != nil {
 		if err != nil {
-			return Response{RawOutput: raw}, fmt.Errorf("command error: %w; parse error: %v", err, parseErr)
+			return Response{RawOutput: raw, SessionID: sessionID}, fmt.Errorf("command error: %w; parse error: %v", err, parseErr)
 		}
-		return Response{RawOutput: raw}, parseErr
+		return Response{RawOutput: raw, SessionID: sessionID}, parseErr
 	}
 	if err != nil {
-		return Response{RawOutput: raw, Parsed: parsed}, err
+		return Response{RawOutput: raw, Parsed: parsed, SessionID: sessionID}, err
 	}
-	return Response{RawOutput: raw, Parsed: parsed}, nil
+	return Response{RawOutput: raw, Parsed: parsed, SessionID: sessionID}, nil
+}
+
+func extractAgentMessageAndSession(raw []byte) (message string, sessionID string) {
+	type event struct {
+		Type     string `json:"type"`
+		ThreadID string `json:"thread_id"`
+		Item     struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"item"`
+	}
+
+	dec := json.NewDecoder(strings.NewReader(string(raw)))
+	for {
+		var ev event
+		if err := dec.Decode(&ev); err != nil {
+			break
+		}
+		if ev.Type == "thread.started" && strings.TrimSpace(ev.ThreadID) != "" {
+			sessionID = ev.ThreadID
+		}
+		if ev.Type == "item.completed" && ev.Item.Type == "agent_message" && strings.TrimSpace(ev.Item.Text) != "" {
+			message = ev.Item.Text
+		}
+	}
+	if strings.TrimSpace(message) == "" {
+		message = string(raw)
+	}
+	return strings.TrimSpace(message), strings.TrimSpace(sessionID)
 }
 
 func ExtractRoundResult(raw []byte) (contracts.RoundResult, error) {

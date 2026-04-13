@@ -1,4 +1,4 @@
 interface:
   display_name: "ralphx"
-  short_description: "Complete workflow for the ralphx repo"
-  default_prompt: "Use $ralphx to install, run, debug, or extend this repo with Codex."
+  short_description: "Outer-loop workflow for pushing repo tasks"
+  default_prompt: "Use $ralphx to keep pushing this repo task to completion with checklist and validation discipline."

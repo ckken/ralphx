@@ -12,6 +12,7 @@ const (
 	LastResultName  = "last-result.json"
 	SummaryFileName = "summary.txt"
 	StatsFileName   = "stats.json"
+	SessionFileName = "session.json"
 	defaultFileMode = 0o644
 	defaultDirMode  = 0o755
 	timestampLayout = "2006-01-02 15:04:05"
@@ -31,5 +32,6 @@ func DerivePaths(workdir, stateDir string) Paths {
 		LastJSONFile:   filepath.Join(root, LastResultName),
 		SummaryFile:    filepath.Join(root, SummaryFileName),
 		StatsFile:      filepath.Join(root, StatsFileName),
+		SessionFile:    filepath.Join(root, SessionFileName),
 	}
 }

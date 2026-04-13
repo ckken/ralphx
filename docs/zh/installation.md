@@ -34,3 +34,23 @@ ralphx --help
 ralphx version
 ralphx current
 ```
+
+## 常用流程
+
+从目标生成 task 和 checklist：
+
+```bash
+ralphx plan --goal "finish the current migration batch" --out tasks/migration.md
+```
+
+基于当前状态重生成下一版 task/checklist：
+
+```bash
+ralphx replan --task tasks/migration.md
+```
+
+恢复仍然有效的 Codex session：
+
+```bash
+ralphx run --task tasks/migration.md --resume --session-expiry 24h
+```
