@@ -86,9 +86,9 @@ func (l Loop) Run(ctx context.Context) error {
 		if err != nil {
 			result := contracts.RoundResult{Status: contracts.StatusBlocked, Mode: contracts.ModeBlocked, ExitSignal: false, FilesModified: 0, TestsPassed: false, Blockers: []string{"runner_error"}, Summary: err.Error()}
 			_ = state.WriteLastResult(paths, result)
-			_ = state.WriteState(paths, iteration, result)
+			_ = state.WriteStateWithContext(paths, iteration, result, l.Config.TaskFile, l.Config.ChecklistFile, nil)
 			if replanned, guidance, replannedErr := l.tryAutoReplan(ctx, paths, "runner_error"); replannedErr == nil && replanned {
-				_ = state.WriteStateWithGuidance(paths, iteration, result, guidance)
+				_ = state.WriteStateWithContext(paths, iteration, result, l.Config.TaskFile, l.Config.ChecklistFile, guidance)
 				return fmt.Errorf("runner error triggered auto-replan; review regenerated task/checklist and rerun")
 			}
 			return err
@@ -103,6 +103,27 @@ func (l Loop) Run(ctx context.Context) error {
 		}
 
 		result := execResult.Result
+		var guidance *state.Guidance
+		if result.Status == contracts.StatusInProgress && result.Mode == contracts.ModeProducePlan {
+			var applyErr error
+			guidance, applyErr = l.applyProducePlan(bundle, paths, result)
+			if applyErr != nil {
+				result = contracts.RoundResult{
+					Status:        contracts.StatusBlocked,
+					Mode:          contracts.ModeBlocked,
+					ExitSignal:    false,
+					FilesModified: 0,
+					TestsPassed:   false,
+					Blockers:      []string{"invalid_produce_plan"},
+					Summary:       applyErr.Error(),
+				}
+				_ = state.WriteLastResult(paths, result)
+				_ = state.WriteStateWithGuidance(paths, iteration, result, guidance)
+				return fmt.Errorf(applyErr.Error())
+			}
+			result.Summary = guidance.Message
+			_ = state.WriteSummary(paths, guidance.Message)
+		}
 		bundle, err = task.Load(l.Config.TaskFile, task.LoadOptions{
 			ChecklistPath: l.Config.ChecklistFile,
 			SummaryPath:   paths.SummaryFile,
@@ -114,7 +135,7 @@ func (l Loop) Run(ctx context.Context) error {
 
 		_ = state.WriteSummary(paths, result.Summary)
 		_ = state.WriteLastResult(paths, result)
-		_ = state.WriteState(paths, iteration, result)
+		_ = state.WriteStateWithContext(paths, iteration, result, l.Config.TaskFile, l.Config.ChecklistFile, guidance)
 		stats := state.Stats{
 			StartedAt:           start.Format("2006-01-02 15:04:05"),
 			UpdatedAt:           time.Now().Format("2006-01-02 15:04:05"),
@@ -130,14 +151,14 @@ func (l Loop) Run(ctx context.Context) error {
 
 		fmt.Printf("[%s] Result: status=%s exit_signal=%t files_modified=%d tests_passed=%t blockers=%d workers=%d\n", ts(time.Now()), result.Status, result.ExitSignal, result.FilesModified, result.TestsPassed, len(result.Blockers), execResult.UsedWorkers)
 
-		if l.Config.TestsCmd != "" && !execResult.Forced {
+		if l.Config.TestsCmd != "" && !execResult.Forced && (result.Mode == contracts.ModeExecuteNextStep || result.Mode == contracts.ModeComplete) {
 			testLog := filepath.Join(paths.LogDir, fmt.Sprintf("tests-%d.log", iteration))
 			if err := validate.Run(ctx, l.Config.Workdir, l.Config.TestsCmd, testLog); err != nil {
 				result = contracts.RoundResult{Status: contracts.StatusBlocked, Mode: contracts.ModeBlocked, ExitSignal: false, FilesModified: 0, TestsPassed: false, Blockers: []string{"tests_failed"}, Summary: "Tests failed"}
 				_ = state.WriteLastResult(paths, result)
-				_ = state.WriteState(paths, iteration, result)
+				_ = state.WriteStateWithContext(paths, iteration, result, l.Config.TaskFile, l.Config.ChecklistFile, nil)
 				if replanned, guidance, replannedErr := l.tryAutoReplan(ctx, paths, "tests_failed"); replannedErr == nil && replanned {
-					_ = state.WriteStateWithGuidance(paths, iteration, result, guidance)
+					_ = state.WriteStateWithContext(paths, iteration, result, l.Config.TaskFile, l.Config.ChecklistFile, guidance)
 					return fmt.Errorf("tests failed and auto-replan regenerated task/checklist; see %s", testLog)
 				}
 				return fmt.Errorf("tests failed; see %s", testLog)
@@ -150,20 +171,20 @@ func (l Loop) Run(ctx context.Context) error {
 		}
 		if result.Status == contracts.StatusBlocked {
 			if replanned, guidance, replannedErr := l.tryAutoReplan(ctx, paths, "blocked"); replannedErr == nil && replanned {
-				_ = state.WriteStateWithGuidance(paths, iteration, result, guidance)
+				_ = state.WriteStateWithContext(paths, iteration, result, l.Config.TaskFile, l.Config.ChecklistFile, guidance)
 				return fmt.Errorf("codex reported blockers and auto-replan regenerated task/checklist")
 			}
 			return fmt.Errorf("codex reported blockers: %s", strings.Join(result.Blockers, ", "))
 		}
 
-		if result.FilesModified > 0 {
+		if result.FilesModified > 0 || result.Mode == contracts.ModeProducePlan {
 			noProgress = 0
 		} else {
 			noProgress++
 		}
 		if l.Config.MaxNoProgress > 0 && noProgress >= l.Config.MaxNoProgress {
 			if replanned, guidance, replannedErr := l.tryAutoReplan(ctx, paths, "no_progress"); replannedErr == nil && replanned {
-				_ = state.WriteStateWithGuidance(paths, iteration, result, guidance)
+				_ = state.WriteStateWithContext(paths, iteration, result, l.Config.TaskFile, l.Config.ChecklistFile, guidance)
 				return fmt.Errorf("stopping after %d no-progress rounds; auto-replan regenerated task/checklist", noProgress)
 			}
 			return fmt.Errorf("stopping after %d no-progress rounds", noProgress)
@@ -391,9 +412,146 @@ func (l Loop) tryAutoReplan(ctx context.Context, paths state.Paths, reason strin
 		Message:       message,
 		TaskFile:      taskFile,
 		ChecklistFile: checklistFile,
+		NextStep:      outcome.TaskMarkdown,
+		ChecklistNote: outcome.Checklist,
 		GeneratedAt:   time.Now().Format("2006-01-02 15:04:05"),
 	}
 	return true, guidance, nil
+}
+
+func (l Loop) applyProducePlan(bundle task.Bundle, paths state.Paths, result contracts.RoundResult) (*state.Guidance, error) {
+	if strings.TrimSpace(result.NextStep) == "" && len(result.ChecklistUpdate) == 0 {
+		return nil, fmt.Errorf("produce_plan did not include next_step or checklist_update")
+	}
+
+	taskFile := bundle.Task.Path
+	checklistFile := bundle.Checklist.Path
+	if strings.TrimSpace(taskFile) == "" {
+		taskFile = l.Config.TaskFile
+	}
+	if strings.TrimSpace(taskFile) == "" {
+		return nil, fmt.Errorf("produce_plan requires a task file path")
+	}
+	if strings.TrimSpace(result.NextStep) != "" {
+		updatedTask := appendPlannedNextStep(bundle.Task.Content, result.NextStep)
+		if err := os.WriteFile(taskFile, []byte(updatedTask), 0o644); err != nil {
+			return nil, err
+		}
+	}
+	if len(result.ChecklistUpdate) > 0 {
+		items := result.ChecklistUpdate
+		if strings.TrimSpace(bundle.Checklist.Content) != "" {
+			items = planMergeChecklist(bundle.Checklist.Content, result.ChecklistUpdate)
+		}
+		if strings.TrimSpace(checklistFile) == "" {
+			checklistFile = plan.ChecklistPath(taskFile)
+		}
+		checklistBody := renderChecklistForPlan(checklistTitle(bundle, taskFile), items)
+		if err := os.WriteFile(checklistFile, []byte(checklistBody), 0o644); err != nil {
+			return nil, err
+		}
+	}
+	message := "Applied produce_plan to task/state"
+	if strings.TrimSpace(result.NextStep) != "" {
+		message = "Applied produce_plan and updated the next step in the task file"
+	}
+	if len(result.ChecklistUpdate) > 0 {
+		message = "Applied produce_plan and updated the checklist"
+	}
+	return &state.Guidance{
+		Reason:        "produce_plan",
+		Message:       message,
+		TaskFile:      taskFile,
+		ChecklistFile: checklistFile,
+		NextStep:      result.NextStep,
+		ChecklistNote: result.ChecklistUpdate,
+		GeneratedAt:   time.Now().Format("2006-01-02 15:04:05"),
+	}, nil
+}
+
+func appendPlannedNextStep(taskContent, nextStep string) string {
+	base := strings.TrimSpace(taskContent)
+	section := "## Planned Next Step\n\n" + strings.TrimSpace(nextStep)
+	if base == "" {
+		return section + "\n"
+	}
+	marker := "\n## Planned Next Step"
+	if idx := strings.Index(base, marker); idx >= 0 {
+		base = strings.TrimSpace(base[:idx])
+	}
+	return base + "\n\n" + section + "\n"
+}
+
+func checklistTitle(bundle task.Bundle, taskFile string) string {
+	taskContent := strings.TrimSpace(bundle.Task.Content)
+	if strings.HasPrefix(taskContent, "# ") {
+		if lineEnd := strings.Index(taskContent, "\n"); lineEnd >= 0 {
+			return strings.TrimSpace(taskContent[2:lineEnd])
+		}
+		return strings.TrimSpace(taskContent[2:])
+	}
+	base := strings.TrimSuffix(filepath.Base(taskFile), filepath.Ext(taskFile))
+	if strings.TrimSpace(base) == "" {
+		return "task"
+	}
+	return base
+}
+
+func renderChecklistForPlan(title string, items []string) string {
+	lines := []string{fmt.Sprintf("# %s checklist", strings.TrimSpace(title)), ""}
+	for _, item := range items {
+		if strings.TrimSpace(item) == "" {
+			continue
+		}
+		lines = append(lines, "- [ ] "+strings.TrimSpace(item))
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func planMergeChecklist(existing string, next []string) []string {
+	completed := completedChecklistTextsForPlan(existing)
+	seen := map[string]bool{}
+	out := make([]string, 0, len(completed)+len(next))
+	for _, item := range completed {
+		key := normalizeChecklistTextForPlan(item)
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, item)
+	}
+	for _, item := range next {
+		key := normalizeChecklistTextForPlan(item)
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, item)
+	}
+	return out
+}
+
+func completedChecklistTextsForPlan(content string) []string {
+	lines := strings.Split(content, "\n")
+	out := make([]string, 0)
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(trimmed, "- [x] "):
+			out = append(out, strings.TrimSpace(trimmed[6:]))
+		case strings.HasPrefix(trimmed, "* [x] "):
+			out = append(out, strings.TrimSpace(trimmed[6:]))
+		case strings.HasPrefix(trimmed, "- [X] "):
+			out = append(out, strings.TrimSpace(trimmed[6:]))
+		case strings.HasPrefix(trimmed, "* [X] "):
+			out = append(out, strings.TrimSpace(trimmed[6:]))
+		}
+	}
+	return out
+}
+
+func normalizeChecklistTextForPlan(text string) string {
+	return strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(text)), " "))
 }
 
 func parseOrRunFailed(err error, result contracts.RoundResult) bool {

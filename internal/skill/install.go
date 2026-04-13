@@ -146,6 +146,18 @@ Common examples:
 go test ./...
 bash scripts/verify-golden.sh --skip-build
 
+## Hook Guard
+
+Use the stop guard when you need an explicit machine-readable exit decision:
+
+ralphx hook stop-guard --task tasks/<name>.md --checklist tasks/<name>.checklist.md
+
+When the guard runs:
+
+- JSON decision is printed to stdout
+- a readable hook status line is printed to stderr
+- structured hook logs are appended under .ralphx/logs/hooks-YYYY-MM-DD.jsonl
+
 ## Recovery
 
 If the loop stops early or reports blocked:

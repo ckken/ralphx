@@ -3,18 +3,22 @@ package state
 import "github.com/ckken/ralphx/internal/contracts"
 
 type RunState struct {
-	Iteration int                   `json:"iteration"`
-	UpdatedAt string                `json:"updated_at"`
-	Result    contracts.RoundResult `json:"result"`
-	Guidance  *Guidance             `json:"guidance,omitempty"`
+	Iteration     int                   `json:"iteration"`
+	UpdatedAt     string                `json:"updated_at"`
+	TaskFile      string                `json:"task_file,omitempty"`
+	ChecklistFile string                `json:"checklist_file,omitempty"`
+	Result        contracts.RoundResult `json:"result"`
+	Guidance      *Guidance             `json:"guidance,omitempty"`
 }
 
 type Guidance struct {
-	Reason        string `json:"reason"`
-	Message       string `json:"message"`
-	TaskFile      string `json:"task_file,omitempty"`
-	ChecklistFile string `json:"checklist_file,omitempty"`
-	GeneratedAt   string `json:"generated_at"`
+	Reason        string   `json:"reason"`
+	Message       string   `json:"message"`
+	TaskFile      string   `json:"task_file,omitempty"`
+	ChecklistFile string   `json:"checklist_file,omitempty"`
+	NextStep      string   `json:"next_step,omitempty"`
+	ChecklistNote []string `json:"checklist_update,omitempty"`
+	GeneratedAt   string   `json:"generated_at"`
 }
 
 type Stats struct {

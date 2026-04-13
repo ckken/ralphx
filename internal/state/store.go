@@ -37,25 +37,47 @@ func WriteLastResult(p Paths, result contracts.RoundResult) error {
 }
 
 func WriteState(p Paths, iteration int, result contracts.RoundResult) error {
-	return WriteStateWithGuidanceAt(p, iteration, result, nil, time.Now())
+	return WriteStateWithContextAt(p, iteration, result, "", "", nil, time.Now())
 }
 
 func WriteStateAt(p Paths, iteration int, result contracts.RoundResult, now time.Time) error {
-	return WriteStateWithGuidanceAt(p, iteration, result, nil, now)
+	return WriteStateWithContextAt(p, iteration, result, "", "", nil, now)
 }
 
 func WriteStateWithGuidance(p Paths, iteration int, result contracts.RoundResult, guidance *Guidance) error {
-	return WriteStateWithGuidanceAt(p, iteration, result, guidance, time.Now())
+	return WriteStateWithContextAt(p, iteration, result, "", "", guidance, time.Now())
 }
 
 func WriteStateWithGuidanceAt(p Paths, iteration int, result contracts.RoundResult, guidance *Guidance, now time.Time) error {
+	return WriteStateWithContextAt(p, iteration, result, "", "", guidance, now)
+}
+
+func WriteStateWithContext(p Paths, iteration int, result contracts.RoundResult, taskFile, checklistFile string, guidance *Guidance) error {
+	return WriteStateWithContextAt(p, iteration, result, taskFile, checklistFile, guidance, time.Now())
+}
+
+func WriteStateWithContextAt(p Paths, iteration int, result contracts.RoundResult, taskFile, checklistFile string, guidance *Guidance, now time.Time) error {
 	runState := RunState{
-		Iteration: iteration,
-		UpdatedAt: formatTimestamp(now),
-		Result:    result,
-		Guidance:  guidance,
+		Iteration:     iteration,
+		UpdatedAt:     formatTimestamp(now),
+		TaskFile:      taskFile,
+		ChecklistFile: checklistFile,
+		Result:        result,
+		Guidance:      guidance,
 	}
 	return writeJSONFile(p.StateFile, runState)
+}
+
+func LoadRunState(p Paths) (RunState, error) {
+	data, err := os.ReadFile(p.StateFile)
+	if err != nil {
+		return RunState{}, err
+	}
+	var runState RunState
+	if err := json.Unmarshal(data, &runState); err != nil {
+		return RunState{}, err
+	}
+	return runState, nil
 }
 
 func WriteStats(p Paths, stats Stats) error {
