@@ -12,14 +12,14 @@
 
 ```bash
 curl -fsSL https://github.com/ckken/ralphx/releases/latest/download/install.sh | bash
-ralphx-doctor
+ralphx doctor
 ```
 
 安装指定版本：
 
 ```bash
 curl -fsSL https://github.com/ckken/ralphx/releases/download/v0.1.2/install.sh | VERSION=v0.1.2 bash
-ralphx-doctor
+ralphx doctor
 ```
 
 安装器会下载 `SHA256SUMS` 并校验二进制后再激活。

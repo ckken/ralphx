@@ -3,7 +3,6 @@ set -euo pipefail
 
 REPO="${GITHUB_REPO:-ckken/ralphx}"
 TOOL_NAME="ralphx"
-DOCTOR_NAME="ralphx-doctor"
 ALIAS_NAME="codex-ralph"
 SKILL_NAME="ralphx"
 LEGACY_SKILL_NAME="ralphx-drive"
@@ -221,7 +220,7 @@ curl -fsSL https://github.com/ckken/ralphx/releases/latest/download/install.sh |
 The installer:
 
 - verifies release checksums
-- installs `ralphx` and `ralphx-doctor`
+- installs `ralphx`
 - installs the Codex skill to `~/.codex/skills/ralphx`
 
 If you need a pinned version, pass `VERSION=vX.Y.Z`.
@@ -334,38 +333,31 @@ main() {
 
   base_url="$(release_base_url)"
   main_asset="$TOOL_NAME-$os-$arch"
-  doctor_asset="$DOCTOR_NAME-$os-$arch"
   sums_asset="SHA256SUMS"
   if [[ "$os" == "windows" ]]; then
     main_asset+='.exe'
-    doctor_asset+='.exe'
   fi
 
   main_target="$target_dir/$TOOL_NAME"
-  doctor_target="$target_dir/$DOCTOR_NAME"
   sums_target="$target_dir/$sums_asset"
-  [[ "$os" == "windows" ]] && main_target+='.exe' && doctor_target+='.exe'
+  [[ "$os" == "windows" ]] && main_target+='.exe'
 
   info "Downloading $sums_asset"
   download "$base_url/$sums_asset" "$sums_target"
   info "Downloading $main_asset"
   download "$base_url/$main_asset" "$main_target"
-  info "Downloading $doctor_asset"
-  download "$base_url/$doctor_asset" "$doctor_target"
 
   verify_checksum "$sums_target" "$main_asset" "$main_target"
-  verify_checksum "$sums_target" "$doctor_asset" "$doctor_target"
-  chmod +x "$main_target" "$doctor_target" || true
+  chmod +x "$main_target" || true
 
   cat > "$CURRENT_ENV" <<EOF
 RALPHX_VERSION="$VERSION"
 RALPHX_BINARY="$main_target"
-RALPHX_DOCTOR_BINARY="$doctor_target"
 EOF
 
   write_wrapper "$BIN_DIR/$TOOL_NAME" "RALPHX_BINARY"
-  write_wrapper "$BIN_DIR/$DOCTOR_NAME" "RALPHX_DOCTOR_BINARY"
   write_wrapper "$BIN_DIR/$ALIAS_NAME" "RALPHX_BINARY"
+  rm -f "$BIN_DIR/ralphx-doctor"
   install_skill
 
   cat <<EOF
@@ -376,7 +368,6 @@ Installed ralphx from GitHub release:
 
 Wrappers:
   $BIN_DIR/$TOOL_NAME
-  $BIN_DIR/$DOCTOR_NAME
   $BIN_DIR/$ALIAS_NAME
 
 Installed skill:
@@ -387,7 +378,6 @@ Persistent execution state:
 
 Downloaded binaries:
   $main_target
-  $doctor_target
 
 Checksums file:
   $sums_target

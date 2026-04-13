@@ -113,7 +113,7 @@ curl -fsSL https://github.com/ckken/ralphx/releases/latest/download/install.sh |
 The installer:
 
 - verifies release checksums
-- installs ralphx and ralphx-doctor
+- installs ralphx
 - installs the Codex skill to ~/.codex/skills/ralphx
 
 If you need a pinned version, pass VERSION=vX.Y.Z.

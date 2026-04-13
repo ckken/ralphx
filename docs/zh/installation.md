@@ -29,7 +29,7 @@ ralphx skill install --project
 ## 验证
 
 ```bash
-ralphx-doctor
+ralphx doctor
 ralphx --help
 ralphx version
 ralphx current

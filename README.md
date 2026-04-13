@@ -24,14 +24,14 @@ Latest release:
 
 ```bash
 curl -fsSL https://github.com/ckken/ralphx/releases/latest/download/install.sh | bash
-ralphx-doctor
+ralphx doctor
 ```
 
 Install a specific version:
 
 ```bash
 curl -fsSL https://github.com/ckken/ralphx/releases/download/v0.1.2/install.sh | VERSION=v0.1.2 bash
-ralphx-doctor
+ralphx doctor
 ```
 
 The installer downloads `SHA256SUMS` and verifies the release binaries before activation.
@@ -58,7 +58,7 @@ Downloaded release binaries are stored under:
 ~/.local/share/ralphx/releases/
 ```
 
-The `ralphx` and `ralphx-doctor` commands are stable wrappers in `~/.local/bin` that always read the current persisted execution path.
+The `ralphx` command is the stable wrapper in `~/.local/bin` that always reads the current persisted execution path.
 
 Inspect the active persisted execution state:
 

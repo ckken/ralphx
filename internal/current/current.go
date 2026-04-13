@@ -26,7 +26,11 @@ func Main(w io.Writer) int {
 	fmt.Fprintf(w, "state_file=%s\n", state.Path)
 	fmt.Fprintf(w, "version=%s\n", state.Version)
 	fmt.Fprintf(w, "binary=%s\n", state.Binary)
-	fmt.Fprintf(w, "doctor_binary=%s\n", state.DoctorBinary)
+	if strings.TrimSpace(state.DoctorBinary) != "" {
+		fmt.Fprintf(w, "doctor_binary=%s\n", state.DoctorBinary)
+	} else {
+		fmt.Fprintln(w, "doctor_command=ralphx doctor")
+	}
 	return 0
 }
 

@@ -26,8 +26,8 @@ remove_if_exists() {
 
 main() {
   remove_if_exists "$BIN_DIR/ralphx"
-  remove_if_exists "$BIN_DIR/ralphx-doctor"
   remove_if_exists "$BIN_DIR/$ALIAS_NAME"
+  remove_if_exists "$BIN_DIR/ralphx-doctor"
   remove_if_exists "$CONFIG_DIR/current.env"
   remove_if_exists "$DATA_DIR/releases"
   remove_if_exists "$SKILLS_DIR/$SKILL_NAME"
