@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/ckken/ralphx/internal/current"
 	"github.com/ckken/ralphx/internal/doctor"
 	"github.com/ckken/ralphx/internal/runner"
+	"github.com/ckken/ralphx/internal/skill"
 	"github.com/ckken/ralphx/internal/version"
 )
 
@@ -31,6 +33,8 @@ func Main(args []string) int {
 		return current.Main(os.Stdout)
 	case "doctor":
 		return doctor.Run(os.Stdout)
+	case "skill":
+		return skillMain(rest)
 	case "run":
 		return run(rest)
 	default:
@@ -68,7 +72,7 @@ func normalizeCommand(args []string) (string, []string) {
 	}
 	first := args[0]
 	switch first {
-	case "run", "doctor", "version", "current", "help", "-h", "--help":
+	case "run", "doctor", "version", "current", "skill", "help", "-h", "--help":
 		return first, args[1:]
 	default:
 		if strings.HasPrefix(first, "-") {
@@ -84,9 +88,66 @@ func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  ralphx run --task FILE [--checklist FILE] [--workdir DIR]")
 	fmt.Println("  ralphx doctor")
+	fmt.Println("  ralphx skill install [--project]")
 	fmt.Println("  ralphx version")
 	fmt.Println("  ralphx current")
 	fmt.Println()
 	fmt.Println("Compatibility:")
 	fmt.Println("  ralphx --task FILE ...      same as: ralphx run --task FILE ...")
+}
+
+func skillMain(args []string) int {
+	if len(args) == 0 {
+		printSkillUsage()
+		return 0
+	}
+
+	switch args[0] {
+	case "help", "-h", "--help":
+		printSkillUsage()
+		return 0
+	case "install":
+		return skillInstall(args[1:])
+	default:
+		fmt.Fprintf(os.Stderr, "unknown skill command: %s\n\n", args[0])
+		printSkillUsage()
+		return 1
+	}
+}
+
+func skillInstall(args []string) int {
+	fs := flag.NewFlagSet("skill install", flag.ContinueOnError)
+	fs.SetOutput(os.Stdout)
+	project := fs.Bool("project", false, "Install to the current repo ./.codex/skills directory")
+	help := fs.Bool("help", false, "Show help")
+	if err := fs.Parse(args); err != nil {
+		fmt.Fprintf(os.Stderr, "skill install argument error: %v\n", err)
+		return 2
+	}
+	if *help {
+		printSkillUsage()
+		return 0
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	path, err := skill.Install(workdir, *project)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Fprintf(os.Stdout, "installed skill: %s\n", path)
+	return 0
+}
+
+func printSkillUsage() {
+	fmt.Println("Usage:")
+	fmt.Println("  ralphx skill install [--project]")
+	fmt.Println()
+	fmt.Println("Defaults:")
+	fmt.Println("  Without --project, installs to ~/.codex/skills/ralphx")
+	fmt.Println("  With --project, installs to ./.codex/skills/ralphx")
 }

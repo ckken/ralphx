@@ -35,6 +35,14 @@ ralphx-doctor
 ```
 
 The installer downloads `SHA256SUMS` and verifies the release binaries before activation.
+It also installs the `ralphx` Codex skill into `~/.codex/skills/ralphx`.
+
+You can also install or refresh the skill from the CLI:
+
+```bash
+ralphx skill install
+ralphx skill install --project
+```
 
 ## Persistent execution path
 

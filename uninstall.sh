@@ -4,6 +4,10 @@ set -euo pipefail
 BIN_DIR="${PREFIX:-${HOME}/.local/bin}"
 DATA_DIR="${RALPHX_DATA_DIR:-${HOME}/.local/share/ralphx}"
 CONFIG_DIR="${RALPHX_CONFIG_DIR:-${HOME}/.config/ralphx}"
+CODEX_HOME_DIR="${CODEX_HOME:-${HOME}/.codex}"
+SKILLS_DIR="$CODEX_HOME_DIR/skills"
+SKILL_NAME="ralphx"
+LEGACY_SKILL_NAME="ralphx-drive"
 
 info() {
   printf '[uninstall] %s\n' "$*"
@@ -24,6 +28,8 @@ main() {
   remove_if_exists "$BIN_DIR/ralphx-doctor"
   remove_if_exists "$CONFIG_DIR/current.env"
   remove_if_exists "$DATA_DIR/releases"
+  remove_if_exists "$SKILLS_DIR/$SKILL_NAME"
+  remove_if_exists "$SKILLS_DIR/$LEGACY_SKILL_NAME"
 }
 
 main "$@"
