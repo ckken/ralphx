@@ -24,7 +24,14 @@ remove_if_exists() {
   fi
 }
 
+best_effort_uninstall_hooks() {
+  if [[ -x "$BIN_DIR/ralphx" ]]; then
+    "$BIN_DIR/ralphx" hook uninstall >/dev/null 2>&1 || true
+  fi
+}
+
 main() {
+  best_effort_uninstall_hooks
   remove_if_exists "$BIN_DIR/ralphx"
   remove_if_exists "$BIN_DIR/$ALIAS_NAME"
   remove_if_exists "$BIN_DIR/ralphx-doctor"

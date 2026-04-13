@@ -141,6 +141,8 @@ func hookMain(args []string) int {
 		return 0
 	case "install":
 		return hookInstall(args[1:])
+	case "status":
+		return hookStatus(args[1:])
 	case "uninstall":
 		return hookUninstall(args[1:])
 	case "prompt-submit":
@@ -164,6 +166,7 @@ func hookStopGuard(args []string) int {
 	testsRequired := fs.Bool("tests-required", false, "Require passing verification before allowing stop")
 	testsPassed := fs.Bool("tests-passed", false, "Indicate the latest verification passed")
 	jsonOut := fs.Bool("json", true, "Print JSON output")
+	nativeJSON := fs.Bool("native-json", false, "Emit native Codex Stop-hook JSON shape")
 	help := fs.Bool("help", false, "Show help")
 	if err := fs.Parse(args); err != nil {
 		fmt.Fprintf(os.Stderr, "hook stop-guard argument error: %v\n", err)
@@ -198,7 +201,9 @@ func hookStopGuard(args []string) int {
 				Result:   map[string]any{"workdir": *workdir},
 			})
 			fmt.Fprintf(os.Stderr, "[hook stop-guard] allow: %s\n", decision.Message)
-			if *jsonOut {
+			if *nativeJSON {
+				fmt.Fprintln(os.Stdout, "{}")
+			} else if *jsonOut {
 				enc := json.NewEncoder(os.Stdout)
 				enc.SetIndent("", "  ")
 				_ = enc.Encode(decision)
@@ -224,7 +229,21 @@ func hookStopGuard(args []string) int {
 		Decision:      decision,
 		Result:        input.Result,
 	})
+	_ = hooks.WriteLatest(filepath.Join(guardStateDir, "last-hook-event.json"), hooks.LogEntry{
+		Event:         hooks.EventStop,
+		TaskPath:      *taskPath,
+		ChecklistPath: *checklistPath,
+		Decision:      decision,
+		Result:        input.Result,
+	})
 	_ = hooks.AppendUserLog(hooks.LogEntry{
+		Event:         hooks.EventStop,
+		TaskPath:      *taskPath,
+		ChecklistPath: *checklistPath,
+		Decision:      decision,
+		Result:        input.Result,
+	})
+	_ = hooks.WriteUserLatest(hooks.LogEntry{
 		Event:         hooks.EventStop,
 		TaskPath:      *taskPath,
 		ChecklistPath: *checklistPath,
@@ -236,7 +255,20 @@ func hookStopGuard(args []string) int {
 	} else {
 		fmt.Fprintf(os.Stderr, "[hook stop-guard] block (%s): %s\n", decision.Reason, decision.Message)
 	}
-	if *jsonOut {
+	if *nativeJSON {
+		if decision.Allow {
+			fmt.Fprintln(os.Stdout, "{}")
+		} else {
+			enc := json.NewEncoder(os.Stdout)
+			enc.SetIndent("", "  ")
+			_ = enc.Encode(map[string]any{
+				"decision":      "block",
+				"reason":        decision.Message,
+				"stopReason":    decision.Reason,
+				"systemMessage": decision.Message,
+			})
+		}
+	} else if *jsonOut {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
 		_ = enc.Encode(decision)
@@ -304,7 +336,27 @@ func hookPromptSubmit(args []string) int {
 			"workdir": effectiveWorkdir,
 		},
 	})
+	_ = hooks.WriteLatest(filepath.Join(guardStateDir, "last-hook-event.json"), hooks.LogEntry{
+		Event:    hooks.EventPromptSubmit,
+		TaskPath: "",
+		Decision: decision,
+		Result: map[string]any{
+			"active":  active,
+			"text":    text,
+			"workdir": effectiveWorkdir,
+		},
+	})
 	_ = hooks.AppendUserLog(hooks.LogEntry{
+		Event:    hooks.EventPromptSubmit,
+		TaskPath: "",
+		Decision: decision,
+		Result: map[string]any{
+			"active":  active,
+			"text":    text,
+			"workdir": effectiveWorkdir,
+		},
+	})
+	_ = hooks.WriteUserLatest(hooks.LogEntry{
 		Event:    hooks.EventPromptSubmit,
 		TaskPath: "",
 		Decision: decision,
@@ -320,20 +372,54 @@ func hookPromptSubmit(args []string) int {
 	if *jsonOut {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
-		payload := map[string]any{
-			"active":  active,
-			"message": decision.Message,
-		}
 		if active {
-			payload = map[string]any{
+			_ = enc.Encode(map[string]any{
 				"hookSpecificOutput": map[string]any{
 					"hookEventName":     "UserPromptSubmit",
 					"additionalContext": "ralphx workflow active. Continue the current branch of work; do not stop at advice alone. Execute one bounded next step or emit a concrete next-step plan.",
 				},
-			}
+			})
+		} else {
+			_ = enc.Encode(map[string]any{})
 		}
-		_ = enc.Encode(payload)
 	}
+	return 0
+}
+
+func hookStatus(args []string) int {
+	fs := flag.NewFlagSet("hook status", flag.ContinueOnError)
+	fs.SetOutput(os.Stdout)
+	workdir := fs.String("workdir", envOr("WORKDIR", mustGetwd()), "Working directory")
+	stateDir := fs.String("state-dir", "", "Override state directory (default <workdir>/.ralphx)")
+	help := fs.Bool("help", false, "Show help")
+	if err := fs.Parse(args); err != nil {
+		fmt.Fprintf(os.Stderr, "hook status argument error: %v\n", err)
+		return 2
+	}
+	if *help {
+		printHookUsage()
+		return 0
+	}
+	root := *stateDir
+	if strings.TrimSpace(root) == "" {
+		root = filepath.Join(*workdir, ".ralphx")
+	}
+	repoLatest, repoErr := hooks.ReadLatest(filepath.Join(root, "last-hook-event.json"))
+	userLatest, userErr := hooks.ReadLatest(filepath.Join(os.Getenv("HOME"), ".codex", "log", "ralphx-last-hook-event.json"))
+	out := map[string]any{}
+	if repoErr == nil {
+		out["repo"] = repoLatest
+	}
+	if userErr == nil {
+		out["user"] = userLatest
+	}
+	if len(out) == 0 {
+		fmt.Fprintln(os.Stderr, "no hook status found")
+		return 1
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(out)
 	return 0
 }
 
@@ -631,6 +717,7 @@ func printHookUsage() {
 	fmt.Println("  ralphx hook stop-guard --task FILE [--checklist FILE]")
 	fmt.Println("  ralphx hook prompt-submit [--payload FILE]")
 	fmt.Println("  ralphx hook install")
+	fmt.Println("  ralphx hook status")
 	fmt.Println("  ralphx hook uninstall")
 	fmt.Println()
 	fmt.Println("Examples:")

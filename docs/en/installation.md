@@ -18,12 +18,20 @@ curl -fsSL https://github.com/ckken/ralphx/releases/download/v0.1.2/install.sh |
 
 The installer downloads `SHA256SUMS` and verifies the release binaries before activating them.
 It also installs the `ralphx` Codex skill into `~/.codex/skills/ralphx`.
+It also installs managed Codex hooks into `~/.codex/hooks.json`.
 
 You can also install or refresh the skill from the CLI:
 
 ```bash
 ralphx skill install
 ralphx skill install --project
+```
+
+You can also install or refresh the hooks from the CLI:
+
+```bash
+ralphx hook install
+ralphx hook uninstall
 ```
 
 ## Verify

@@ -18,12 +18,20 @@ curl -fsSL https://github.com/ckken/ralphx/releases/download/v0.1.2/install.sh |
 
 安装器会下载 `SHA256SUMS`，校验通过后才激活二进制。
 它还会把 `ralphx` Codex skill 安装到 `~/.codex/skills/ralphx`。
+它还会把受管的 Codex hooks 安装到 `~/.codex/hooks.json`。
 
 你也可以通过 CLI 重新安装或刷新 skill：
 
 ```bash
 ralphx skill install
 ralphx skill install --project
+```
+
+你也可以通过 CLI 安装或卸载 hooks：
+
+```bash
+ralphx hook install
+ralphx hook uninstall
 ```
 
 ## 验证

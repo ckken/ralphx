@@ -323,6 +323,15 @@ install_skill() {
   fi
 }
 
+install_hooks() {
+  local binary_path="$1"
+  if [[ ! -x "$binary_path" ]]; then
+    die "Cannot install hooks: missing executable $binary_path"
+  fi
+  "$binary_path" hook install >/dev/null
+  info "Installed global Codex hooks in $CODEX_HOME_DIR/hooks.json"
+}
+
 main() {
   read -r os arch < <(detect_platform)
   local version_dir target_dir base_url main_asset doctor_asset sums_asset main_target doctor_target sums_target
@@ -359,6 +368,7 @@ EOF
   write_wrapper "$BIN_DIR/$ALIAS_NAME" "RALPHX_BINARY"
   rm -f "$BIN_DIR/ralphx-doctor"
   install_skill
+  install_hooks "$main_target"
 
   cat <<EOF
 Installed ralphx from GitHub release:
@@ -372,6 +382,9 @@ Wrappers:
 
 Installed skill:
   $SKILLS_DIR/$SKILL_NAME
+
+Installed hooks:
+  $CODEX_HOME_DIR/hooks.json
 
 Persistent execution state:
   $CURRENT_ENV

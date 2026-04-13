@@ -65,3 +65,29 @@ func TestAppendUserLogWritesUnderCodexLog(t *testing.T) {
 		t.Fatalf("expected 1 user log file, got %d", len(entries))
 	}
 }
+
+func TestWriteLatestAndReadLatest(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "last-hook-event.json")
+	entry := LogEntry{
+		Event: EventPromptSubmit,
+		Decision: Decision{
+			Allow:   true,
+			Reason:  "prompt_submit",
+			Message: "ralphx mode active",
+		},
+	}
+	if err := WriteLatest(path, entry); err != nil {
+		t.Fatalf("WriteLatest() error = %v", err)
+	}
+	got, err := ReadLatest(path)
+	if err != nil {
+		t.Fatalf("ReadLatest() error = %v", err)
+	}
+	if got.Event != EventPromptSubmit {
+		t.Fatalf("event = %q", got.Event)
+	}
+	if got.Decision.Reason != "prompt_submit" {
+		t.Fatalf("reason = %q", got.Decision.Reason)
+	}
+}

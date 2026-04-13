@@ -24,12 +24,20 @@ ralphx doctor
 
 安装器会下载 `SHA256SUMS` 并校验二进制后再激活。
 它还会把 `ralphx` Codex skill 安装到 `~/.codex/skills/ralphx`。
+它还会把受管的 Codex hooks 安装到 `~/.codex/hooks.json`。
 
 你也可以通过 CLI 重新安装或刷新 skill：
 
 ```bash
 ralphx skill install
 ralphx skill install --project
+```
+
+你也可以通过 CLI 安装或卸载 hooks：
+
+```bash
+ralphx hook install
+ralphx hook uninstall
 ```
 
 ## 执行路径持久化

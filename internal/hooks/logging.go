@@ -45,3 +45,38 @@ func AppendUserLog(entry LogEntry) error {
 	}
 	return AppendLog(filepath.Join(home, ".codex", "log"), entry)
 }
+
+func WriteLatest(path string, entry LogEntry) error {
+	if entry.Timestamp == "" {
+		entry.Timestamp = time.Now().Format(time.RFC3339)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(entry, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	return os.WriteFile(path, data, 0o644)
+}
+
+func WriteUserLatest(entry LogEntry) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	return WriteLatest(filepath.Join(home, ".codex", "log", "ralphx-last-hook-event.json"), entry)
+}
+
+func ReadLatest(path string) (LogEntry, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return LogEntry{}, err
+	}
+	var entry LogEntry
+	if err := json.Unmarshal(data, &entry); err != nil {
+		return LogEntry{}, err
+	}
+	return entry, nil
+}

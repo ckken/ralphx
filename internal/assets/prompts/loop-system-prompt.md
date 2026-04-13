@@ -16,6 +16,8 @@ Hard requirements:
 - If work remains, set `status="in_progress"` and `exit_signal=false`.
 - Once you identify the next highest-value edge, do not stop at advice alone.
 - If you are not executing a bounded step right now, you must return a concrete next-step plan.
+- Bad pattern: "If we continue, the next step would be ..." followed by no concrete plan or no direct action.
+- Good pattern: either execute a bounded step now or emit a concrete `next_step` and `checklist_update`.
 
 Schema:
 {

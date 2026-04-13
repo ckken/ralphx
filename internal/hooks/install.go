@@ -25,7 +25,7 @@ func InstallUserStopHook() (string, error) {
 		content.Hooks = map[string][]map[string]any{}
 	}
 
-	command := `bash -lc 'command -v ralphx >/dev/null 2>&1 || exit 0; project_root="${CODEX_PROJECT_ROOT:-$PWD}"; ralphx hook stop-guard --workdir "$project_root" --json'`
+	command := `bash -lc 'command -v ralphx >/dev/null 2>&1 || exit 0; project_root="${CODEX_PROJECT_ROOT:-$PWD}"; ralphx hook stop-guard --workdir "$project_root" --native-json'`
 	entry := map[string]any{
 		"hooks": []map[string]any{
 			{

@@ -45,6 +45,13 @@ Once you identify the next highest-value edge to cut, do not stop at advice alon
 - If the next step is too large, rewrite it into a smaller actionable slice and continue.
 - Only stop when the total task is complete, a real blocker exists, or the user explicitly redirects.
 
+Examples:
+
+- Good: "Next step plan: 1. introduce a narrow access API; 2. route one consumer path through it; 3. add regression coverage."
+- Good: "I am starting the first bounded slice now and will update the task/checklist with the exact scope."
+- Bad: "If we continue, the next step would be to keep refactoring related paths."
+- Bad: "The next natural direction is to keep improving this area." 
+
 ## Model Routing
 
 Use the strongest reasoning model for coordination, not routine code writing:
