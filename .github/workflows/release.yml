@@ -43,16 +43,21 @@ jobs:
           if [ "$GOOS" = "windows" ]; then ext=".exe"; fi
           go build -o "dist/ralphx-${GOOS}-${GOARCH}${ext}" ./cmd/ralphx
           go build -o "dist/ralphx-doctor-${GOOS}-${GOARCH}${ext}" ./cmd/ralphx-doctor
+      - name: Generate SHA256SUMS
+        run: |
+          cd dist
+          sha256sum * > SHA256SUMS
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/ralphx-${{ matrix.goos }}-${{ matrix.goarch }}*
             dist/ralphx-doctor-${{ matrix.goos }}-${{ matrix.goarch }}*
-      - name: Upload installer assets
+      - name: Upload checksums and installer assets
         if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            dist/SHA256SUMS
             install.sh
             uninstall.sh

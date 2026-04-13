@@ -13,16 +13,14 @@ RELEASES_DIR="$DATA_DIR/releases"
 BACKUP_SUFFIX="$(date +%Y%m%d%H%M%S)"
 
 info() {
-  printf '[install] %s\n' "$*"
+  printf '[install] %s
+' "$*"
 }
 
 die() {
-  printf '%s\n' "$*" >&2
+  printf '%s
+' "$*" >&2
   exit 1
-}
-
-need_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"
 }
 
 detect_platform() {
@@ -39,14 +37,17 @@ detect_platform() {
     arm64|aarch64) arch="arm64" ;;
     *) die "Unsupported architecture: $arch" ;;
   esac
-  printf '%s %s\n' "$os" "$arch"
+  printf '%s %s
+' "$os" "$arch"
 }
 
 release_base_url() {
   if [[ "$VERSION" == "latest" ]]; then
-    printf 'https://github.com/%s/releases/latest/download\n' "$REPO"
+    printf 'https://github.com/%s/releases/latest/download
+' "$REPO"
   else
-    printf 'https://github.com/%s/releases/download/%s\n' "$REPO" "$VERSION"
+    printf 'https://github.com/%s/releases/download/%s
+' "$REPO" "$VERSION"
   fi
 }
 
@@ -60,6 +61,23 @@ download() {
   else
     die "Need curl or wget to download release assets"
   fi
+}
+
+verify_checksum() {
+  local sums_file="$1"
+  local asset_name="$2"
+  local asset_path="$3"
+  local expected actual
+  expected="$(grep "  $asset_name$" "$sums_file" | awk '{print $1}')"
+  [[ -n "$expected" ]] || die "Checksum for $asset_name not found in SHA256SUMS"
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual="$(sha256sum "$asset_path" | awk '{print $1}')"
+  elif command -v shasum >/dev/null 2>&1; then
+    actual="$(shasum -a 256 "$asset_path" | awk '{print $1}')"
+  else
+    die "Need sha256sum or shasum to verify release assets"
+  fi
+  [[ "$expected" == "$actual" ]] || die "Checksum mismatch for $asset_name"
 }
 
 write_wrapper() {
@@ -87,20 +105,17 @@ EOF
 }
 
 main() {
-  need_cmd uname
-  need_cmd mkdir
   read -r os arch < <(detect_platform)
-  local version_dir target_dir base_url main_asset doctor_asset main_target doctor_target
+  local version_dir target_dir base_url main_asset doctor_asset sums_asset main_target doctor_target sums_target
   version_dir="$VERSION"
-  if [[ "$version_dir" == "latest" ]]; then
-    version_dir="latest"
-  fi
+  [[ "$version_dir" == "latest" ]] && version_dir="latest"
   target_dir="$RELEASES_DIR/$version_dir/$os-$arch"
   mkdir -p "$target_dir" "$CONFIG_DIR" "$BIN_DIR"
 
   base_url="$(release_base_url)"
   main_asset="$TOOL_NAME-$os-$arch"
   doctor_asset="$DOCTOR_NAME-$os-$arch"
+  sums_asset="SHA256SUMS"
   if [[ "$os" == "windows" ]]; then
     main_asset+='.exe'
     doctor_asset+='.exe'
@@ -108,12 +123,18 @@ main() {
 
   main_target="$target_dir/$TOOL_NAME"
   doctor_target="$target_dir/$DOCTOR_NAME"
+  sums_target="$target_dir/$sums_asset"
   [[ "$os" == "windows" ]] && main_target+='.exe' && doctor_target+='.exe'
 
+  info "Downloading $sums_asset"
+  download "$base_url/$sums_asset" "$sums_target"
   info "Downloading $main_asset"
   download "$base_url/$main_asset" "$main_target"
   info "Downloading $doctor_asset"
   download "$base_url/$doctor_asset" "$doctor_target"
+
+  verify_checksum "$sums_target" "$main_asset" "$main_target"
+  verify_checksum "$sums_target" "$doctor_asset" "$doctor_target"
   chmod +x "$main_target" "$doctor_target" || true
 
   cat > "$CURRENT_ENV" <<EOF
@@ -141,6 +162,9 @@ Persistent execution state:
 Downloaded binaries:
   $main_target
   $doctor_target
+
+Checksums file:
+  $sums_target
 
 If $BIN_DIR is not on PATH, add it:
   export PATH="$BIN_DIR:\$PATH"
