@@ -76,6 +76,8 @@ Rules:
 - Make the smallest correct change.
 - If a checklist file is provided, you must treat unchecked items as hard remaining work.
 - Update the checklist file when you complete a milestone.
+- Once you identify the next highest-value edge, do not stop at advice alone.
+- If you are not executing a bounded step right now, you must return a concrete next-step plan.
 - If the task is not complete, return status="in_progress".
 - If blocked, return status="blocked" and include blockers.
 - If done, return status="complete" and set exit_signal=true.
@@ -83,11 +85,14 @@ Rules:
 - Use this schema:
   {
     "status": "in_progress|blocked|complete",
+    "mode": "execute_next_step|produce_plan|blocked|complete",
     "exit_signal": true|false,
     "files_modified": 0,
     "tests_passed": true|false,
     "blockers": [],
-    "summary": "short summary"
+    "summary": "short summary",
+    "next_step": "required when mode=produce_plan",
+    "checklist_update": ["optional checklist items for the next slice"]
   }
 `, strings.TrimSpace(in.Template), in.Bundle.Task.Content, in.Iteration, in.Workdir, checklistPath, checklistOpenItems, checklistContent, in.Bundle.State.Summary, in.Bundle.State.State, in.GitStatus)
 }

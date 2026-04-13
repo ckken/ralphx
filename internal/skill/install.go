@@ -48,6 +48,15 @@ When invoked in a non-ralphx repository:
 - keep moving on the user task until the real objective is done, blocked, or needs clarification
 - prefer low-risk, well-bounded progress when the task is large or ambiguous
 
+## Continuation Discipline
+
+Once you identify the next highest-value edge to cut, do not stop at advice alone.
+
+- Do not stop after recommending the next step.
+- You must either produce the next concrete plan or directly execute one bounded next step.
+- If the next step is too large, rewrite it into a smaller actionable slice and continue.
+- Only stop when the total task is complete, a real blocker exists, or the user explicitly redirects.
+
 ## Model Routing
 
 Use the strongest reasoning model for coordination, not routine code writing:

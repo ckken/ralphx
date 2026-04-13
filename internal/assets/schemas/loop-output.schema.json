@@ -1,39 +1,91 @@
-     1|{
-     2|  "$schema": "https://json-schema.org/draft/2020-12/schema",
-     3|  "type": "object",
-     4|  "additionalProperties": false,
-     5|  "required": [
-     6|    "status",
-     7|    "exit_signal",
-     8|    "files_modified",
-     9|    "tests_passed",
-    10|    "blockers",
-    11|    "summary"
-    12|  ],
-    13|  "properties": {
-    14|    "status": {
-    15|      "type": "string",
-    16|      "enum": ["in_progress", "blocked", "complete"]
-    17|    },
-    18|    "exit_signal": {
-    19|      "type": "boolean"
-    20|    },
-    21|    "files_modified": {
-    22|      "type": "integer",
-    23|      "minimum": 0
-    24|    },
-    25|    "tests_passed": {
-    26|      "type": "boolean"
-    27|    },
-    28|    "blockers": {
-    29|      "type": "array",
-    30|      "items": {
-    31|        "type": "string"
-    32|      }
-    33|    },
-    34|    "summary": {
-    35|      "type": "string"
-    36|    }
-    37|  }
-    38|}
-    39|
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "mode",
+    "exit_signal",
+    "files_modified",
+    "tests_passed",
+    "blockers",
+    "summary"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["in_progress", "blocked", "complete"]
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["execute_next_step", "produce_plan", "blocked", "complete"]
+    },
+    "exit_signal": {
+      "type": "boolean"
+    },
+    "files_modified": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tests_passed": {
+      "type": "boolean"
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "summary": {
+      "type": "string"
+    },
+    "next_step": {
+      "type": "string"
+    },
+    "checklist_update": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": { "const": "in_progress" },
+          "mode": { "const": "execute_next_step" }
+        }
+      },
+      "then": {
+        "properties": {
+          "files_modified": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": { "const": "in_progress" },
+          "mode": { "const": "produce_plan" }
+        }
+      },
+      "then": {
+        "anyOf": [
+          {
+            "required": ["next_step"],
+            "properties": {
+              "next_step": { "type": "string", "minLength": 1 }
+            }
+          },
+          {
+            "required": ["checklist_update"],
+            "properties": {
+              "checklist_update": { "type": "array", "minItems": 1 }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

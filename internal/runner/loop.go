@@ -84,7 +84,7 @@ func (l Loop) Run(ctx context.Context) error {
 
 		execResult, nextSession, err := l.runIteration(ctx, iteration, bundle, template, schemaPath, paths, session)
 		if err != nil {
-			result := contracts.RoundResult{Status: contracts.StatusBlocked, ExitSignal: false, FilesModified: 0, TestsPassed: false, Blockers: []string{"runner_error"}, Summary: err.Error()}
+			result := contracts.RoundResult{Status: contracts.StatusBlocked, Mode: contracts.ModeBlocked, ExitSignal: false, FilesModified: 0, TestsPassed: false, Blockers: []string{"runner_error"}, Summary: err.Error()}
 			_ = state.WriteLastResult(paths, result)
 			_ = state.WriteState(paths, iteration, result)
 			if replanned, guidance, replannedErr := l.tryAutoReplan(ctx, paths, "runner_error"); replannedErr == nil && replanned {
@@ -133,7 +133,7 @@ func (l Loop) Run(ctx context.Context) error {
 		if l.Config.TestsCmd != "" && !execResult.Forced {
 			testLog := filepath.Join(paths.LogDir, fmt.Sprintf("tests-%d.log", iteration))
 			if err := validate.Run(ctx, l.Config.Workdir, l.Config.TestsCmd, testLog); err != nil {
-				result = contracts.RoundResult{Status: contracts.StatusBlocked, ExitSignal: false, FilesModified: 0, TestsPassed: false, Blockers: []string{"tests_failed"}, Summary: "Tests failed"}
+				result = contracts.RoundResult{Status: contracts.StatusBlocked, Mode: contracts.ModeBlocked, ExitSignal: false, FilesModified: 0, TestsPassed: false, Blockers: []string{"tests_failed"}, Summary: "Tests failed"}
 				_ = state.WriteLastResult(paths, result)
 				_ = state.WriteState(paths, iteration, result)
 				if replanned, guidance, replannedErr := l.tryAutoReplan(ctx, paths, "tests_failed"); replannedErr == nil && replanned {
@@ -293,14 +293,14 @@ func (l Loop) runParallelIteration(ctx context.Context, iteration int, bundle ta
 		return roundExecution{}, state.SessionMeta{}, err
 	}
 	if allComplete && postBundle.Checklist.OpenItems == 0 {
-		result := contracts.RoundResult{Status: contracts.StatusComplete, ExitSignal: true, FilesModified: max(1, filesModified), TestsPassed: true, Blockers: nil, Summary: fmt.Sprintf("completed %d checklist jobs", len(results))}
+		result := contracts.RoundResult{Status: contracts.StatusComplete, Mode: contracts.ModeComplete, ExitSignal: true, FilesModified: max(1, filesModified), TestsPassed: true, Blockers: nil, Summary: fmt.Sprintf("completed %d checklist jobs", len(results))}
 		result, forced := applyGlobalGates(result, preSnap, postSnap, postBundle.Checklist.OpenItems)
 		return roundExecution{Result: result, Forced: forced, UsedWorkers: min(l.Config.Workers, len(jobs)), Summary: result.Summary}, state.SessionMeta{}, nil
 	}
 	if len(blocked) > 0 && len(completedIndexes) == 0 {
-		return roundExecution{Result: contracts.RoundResult{Status: contracts.StatusBlocked, ExitSignal: false, FilesModified: filesModified, TestsPassed: false, Blockers: contracts.NormalizeBlockers(blocked), Summary: "parallel jobs blocked"}, UsedWorkers: min(l.Config.Workers, len(jobs))}, state.SessionMeta{}, nil
+		return roundExecution{Result: contracts.RoundResult{Status: contracts.StatusBlocked, Mode: contracts.ModeBlocked, ExitSignal: false, FilesModified: filesModified, TestsPassed: false, Blockers: contracts.NormalizeBlockers(blocked), Summary: "parallel jobs blocked"}, UsedWorkers: min(l.Config.Workers, len(jobs))}, state.SessionMeta{}, nil
 	}
-	return roundExecution{Result: contracts.RoundResult{Status: contracts.StatusInProgress, ExitSignal: false, FilesModified: filesModified, TestsPassed: false, Blockers: nil, Summary: fmt.Sprintf("completed %d/%d checklist jobs", len(completedIndexes), len(jobs))}, UsedWorkers: min(l.Config.Workers, len(jobs))}, state.SessionMeta{}, nil
+	return roundExecution{Result: contracts.RoundResult{Status: contracts.StatusInProgress, Mode: contracts.ModeExecuteNextStep, ExitSignal: false, FilesModified: max(1, filesModified), TestsPassed: false, Blockers: nil, Summary: fmt.Sprintf("completed %d/%d checklist jobs", len(completedIndexes), len(jobs))}, UsedWorkers: min(l.Config.Workers, len(jobs))}, state.SessionMeta{}, nil
 }
 
 func (l Loop) executeJob(ctx context.Context, iteration int, bundle task.Bundle, template, schemaPath string, paths state.Paths, gitStatus string, job parallel.Job) (parallel.WorkerResult, error) {
@@ -336,11 +336,11 @@ func applyGlobalGates(result contracts.RoundResult, preSnap, postSnap vcs.Snapsh
 	forced := false
 	if result.Status == contracts.StatusComplete && result.ExitSignal && result.FilesModified <= 0 && preSnap.Status == postSnap.Status {
 		forced = true
-		result = contracts.RoundResult{Status: contracts.StatusInProgress, ExitSignal: false, FilesModified: 0, TestsPassed: false, Blockers: nil, Summary: "Ignored premature completion because no new changes were detected. " + result.Summary}
+		result = contracts.RoundResult{Status: contracts.StatusInProgress, Mode: contracts.ModeProducePlan, ExitSignal: false, FilesModified: 0, TestsPassed: false, Blockers: nil, Summary: "Ignored premature completion because no new changes were detected. " + result.Summary, NextStep: "Continue with the next remaining bounded step instead of declaring completion."}
 	}
 	if result.Status == contracts.StatusComplete && result.ExitSignal && checklistOpenItems > 0 {
 		forced = true
-		result = contracts.RoundResult{Status: contracts.StatusInProgress, ExitSignal: false, FilesModified: 0, TestsPassed: false, Blockers: nil, Summary: fmt.Sprintf("Ignored premature completion because checklist still has %d open items. %s", checklistOpenItems, result.Summary)}
+		result = contracts.RoundResult{Status: contracts.StatusInProgress, Mode: contracts.ModeProducePlan, ExitSignal: false, FilesModified: 0, TestsPassed: false, Blockers: nil, Summary: fmt.Sprintf("Ignored premature completion because checklist still has %d open items. %s", checklistOpenItems, result.Summary), NextStep: "Continue with the remaining checklist items."}
 	}
 	return result, forced
 }
