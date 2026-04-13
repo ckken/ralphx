@@ -23,6 +23,14 @@ ralphx-doctor
 ```
 
 安装器会下载 `SHA256SUMS` 并校验二进制后再激活。
+它还会把 `ralphx` Codex skill 安装到 `~/.codex/skills/ralphx`。
+
+你也可以通过 CLI 重新安装或刷新 skill：
+
+```bash
+ralphx skill install
+ralphx skill install --project
+```
 
 ## 执行路径持久化
 
@@ -36,4 +44,22 @@ ralphx-doctor
 
 ```bash
 ralphx current
+```
+
+从目标生成 task 和 checklist：
+
+```bash
+ralphx plan --goal "finish the current migration batch" --out tasks/migration.md
+```
+
+基于当前状态重生成下一版 task/checklist：
+
+```bash
+ralphx replan --task tasks/migration.md
+```
+
+恢复仍然有效的 Codex session：
+
+```bash
+ralphx run --task tasks/migration.md --resume --session-expiry 24h
 ```

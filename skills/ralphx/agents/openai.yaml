@@ -1,0 +1,4 @@
+interface:
+  display_name: "ralphx"
+  short_description: "Outer-loop workflow for pushing repo tasks"
+  default_prompt: "Use $ralphx to keep pushing this repo task to completion with checklist and validation discipline."

@@ -12,11 +12,13 @@ type Request struct {
 	OutputSchemaPath string
 	RawLogPath       string
 	ExtraArgs        []string
+	SessionID        string
 }
 
 type Response struct {
 	RawOutput []byte
 	Parsed    contracts.RoundResult
+	SessionID string
 }
 
 type Agent interface {
