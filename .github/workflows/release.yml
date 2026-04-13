@@ -1,0 +1,58 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Test
+        run: go test ./...
+      - name: Build ralphx
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          mkdir -p dist
+          ext=""
+          if [ "$GOOS" = "windows" ]; then ext=".exe"; fi
+          go build -o "dist/ralphx-${GOOS}-${GOARCH}${ext}" ./cmd/ralphx
+          go build -o "dist/ralphx-doctor-${GOOS}-${GOARCH}${ext}" ./cmd/ralphx-doctor
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/ralphx-${{ matrix.goos }}-${{ matrix.goarch }}*
+            dist/ralphx-doctor-${{ matrix.goos }}-${{ matrix.goarch }}*
+      - name: Upload installer assets
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            install.sh
+            uninstall.sh

@@ -2,7 +2,31 @@
 
 This SOP is the recommended operating path for using `ralphx` in a real repository.
 
-## 1. Preflight
+## 1. Installation
+
+Use release installation, not source installation.
+
+Latest:
+
+```bash
+curl -fsSL https://github.com/ckken/ralphx/releases/latest/download/install.sh | bash
+```
+
+Specific version:
+
+```bash
+curl -fsSL https://github.com/ckken/ralphx/releases/download/v0.1.0/install.sh | VERSION=v0.1.0 bash
+```
+
+The installer persists the active execution path in:
+
+```bash
+~/.config/ralphx/current.env
+```
+
+This allows the wrapper commands to remain stable while the underlying versioned binaries live under `~/.local/share/ralphx/releases/`.
+
+## 2. Preflight
 
 Run:
 
@@ -12,10 +36,9 @@ ralphx-doctor
 
 Minimum expected:
 - `codex` is available
-- `go` is available if building/installing from source
 - `git` is available if you want git-aware completion checks
 
-## 2. Prepare inputs
+## 3. Prepare inputs
 
 Create:
 - one task file describing the total objective
@@ -26,18 +49,7 @@ Rules:
 - checklist = hard remaining work
 - checklist items should be short, independently understandable, and verification-friendly
 
-Good checklist items:
-- add command X
-- update config loader
-- add smoke test
-- update README section
-
-Bad checklist items:
-- finish everything
-- fix all remaining issues
-- make it production ready
-
-## 3. Choose execution mode
+## 4. Choose execution mode
 
 ### Single-worker mode
 Use when:
@@ -63,7 +75,7 @@ Recommended production rule:
 - default to `--workers 1`
 - only increase workers after the checklist is clearly decomposed
 
-## 4. Add validation
+## 5. Add validation
 
 Set `TESTS_CMD` whenever possible.
 
@@ -81,9 +93,7 @@ export TESTS_CMD='bun test && bun run lint'
 export TESTS_CMD='pytest -q'
 ```
 
-Without validation, `ralphx` can still run, but production confidence is lower.
-
-## 5. Run
+## 6. Run
 
 Typical production invocation:
 
@@ -95,7 +105,7 @@ export TESTS_CMD='go test ./...'
 ralphx   --task docs/tasks/release-task.md   --checklist docs/tasks/release-task.checklist.md   --workdir /path/to/repo   --workers 3
 ```
 
-## 6. Inspect outputs
+## 7. Inspect outputs
 
 Key files after a run:
 - `.ralphx/last-result.json`
@@ -110,34 +120,26 @@ Interpretation:
 - `in_progress`: work remains or a complete signal was downgraded
 - `blocked`: real blocker, invalid output, or validation failure
 
-## 7. Production rollout checklist
+## 8. GitHub release promotion SOP
 
-Before pushing to GitHub:
+Before tagging a release:
 - run `go build ./...`
 - run `go test ./...`
 - run `ralphx-doctor`
 - run one single-worker smoke path
 - run one parallel smoke path if you intend to use `--workers`
 - inspect `.ralphx/last-result.json`
-- confirm checklist is fully checked if the run ended `complete`
 
-## 8. GitHub promotion SOP
-
-Recommended sequence:
+Tag and push:
 
 ```bash
 git status
-go build ./...
-go test ./...
 git add .
-git commit -m "feat: productionize Go ralphx workflow"
+git commit -m "feat: release prep"
 git push origin main
+git tag v0.1.0
+git push origin v0.1.0
 ```
-
-If creating the first public-facing rollout, also verify:
-- README install instructions are current
-- doctor output matches reality
-- install/uninstall scripts work on a clean prefix
 
 ## 9. Operating boundaries
 

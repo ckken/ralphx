@@ -27,26 +27,21 @@ It is designed for one core goal:
 - run validation commands
 - split checklist items into parallel worker jobs with `--workers N`
 
-## Current shape
+## Install from GitHub release
 
-Production-relevant surfaces:
-- `ralphx`: main CLI
-- `ralphx-doctor`: environment/self-check command
-- `install.sh`: build + install wrappers into `~/.local/bin`
-- `.ralphx/`: local runtime state, logs, results, runtime schema
+No source build is required for normal use.
 
-Key runtime behavior:
-- single-run mode works with `--workers 1` (default)
-- checklist-driven parallel mode works with `--workers N`
-- leader owns overall completion
-- worker results are advisory; final completion is leader-gated
-
-## Install
+Latest release:
 
 ```bash
-git clone https://github.com/ckken/ralphx.git
-cd ralphx
-./install.sh
+curl -fsSL https://github.com/ckken/ralphx/releases/latest/download/install.sh | bash
+ralphx-doctor
+```
+
+Install a specific version:
+
+```bash
+curl -fsSL https://github.com/ckken/ralphx/releases/download/v0.1.0/install.sh | VERSION=v0.1.0 bash
 ralphx-doctor
 ```
 
@@ -56,11 +51,27 @@ If needed:
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
+## Persistent execution path
+
+The installer persists the active binary paths in:
+
+```bash
+~/.config/ralphx/current.env
+```
+
+Downloaded release binaries are stored under:
+
+```bash
+~/.local/share/ralphx/releases/
+```
+
+The `ralphx` and `ralphx-doctor` commands are stable wrappers in `~/.local/bin` that always read the current persisted execution path.
+
 ## Runtime dependencies
 
 Required:
-- `go` (for local build/install from source)
 - `codex`
+- `curl` or `wget` for release installation
 
 Recommended:
 - `git`
@@ -102,15 +113,6 @@ export MAX_NO_PROGRESS=0
 export ROUND_TIMEOUT_SECONDS=1800
 export RALPHX_WORKERS=3
 ```
-
-Meaning:
-- `CODEX_CMD`: agent executable to invoke
-- `CODEX_ARGS`: extra args passed to the agent
-- `TESTS_CMD`: post-round validation command
-- `MAX_ITERATIONS=0`: no hard iteration cap
-- `MAX_NO_PROGRESS=0`: no no-progress stop gate
-- `ROUND_TIMEOUT_SECONDS`: per-round timeout in seconds
-- `RALPHX_WORKERS`: default worker count for parallel mode
 
 ## Recommended production path
 

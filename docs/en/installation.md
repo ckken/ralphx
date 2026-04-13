@@ -1,10 +1,26 @@
 # Installation
 
-## Required tools
+## Preferred: install from GitHub release
+
+No source build is required for normal usage.
+
+Install the latest release:
+
+```bash
+curl -fsSL https://github.com/ckken/ralphx/releases/latest/download/install.sh | bash
+```
+
+Install a specific version:
+
+```bash
+curl -fsSL https://github.com/ckken/ralphx/releases/download/v0.1.0/install.sh | VERSION=v0.1.0 bash
+```
+
+## Runtime requirements
 
 Required:
-- `go`
 - `codex`
+- `curl` or `wget`
 
 Recommended:
 - `git`
@@ -15,15 +31,17 @@ Recommended:
 Optional:
 - `jq` (legacy-only helper; not required by the Go-native main path)
 
-## Install from source
+## Installed layout
 
-```bash
-git clone https://github.com/ckken/ralphx.git
-cd ralphx
-./install.sh
-```
+Wrappers:
+- `~/.local/bin/ralphx`
+- `~/.local/bin/ralphx-doctor`
 
-By default the commands are installed into `~/.local/bin`.
+Persistent execution state:
+- `~/.config/ralphx/current.env`
+
+Downloaded release binaries:
+- `~/.local/share/ralphx/releases/`
 
 If your shell cannot find `ralphx`, add:
 
@@ -39,14 +57,8 @@ ralphx --help
 ralphx version
 ```
 
-## Install to a custom prefix
-
-```bash
-PREFIX=/custom/bin ./install.sh
-```
-
 ## Uninstall
 
 ```bash
-./uninstall.sh
+curl -fsSL https://github.com/ckken/ralphx/releases/latest/download/uninstall.sh | bash
 ```

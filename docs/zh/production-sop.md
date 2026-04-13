@@ -2,7 +2,31 @@
 
 这是 `ralphx` 在真实仓库中的推荐操作路径。
 
-## 1. 预检
+## 1. 安装
+
+使用 release 安装，不走源码安装。
+
+最新版本：
+
+```bash
+curl -fsSL https://github.com/ckken/ralphx/releases/latest/download/install.sh | bash
+```
+
+指定版本：
+
+```bash
+curl -fsSL https://github.com/ckken/ralphx/releases/download/v0.1.0/install.sh | VERSION=v0.1.0 bash
+```
+
+安装器会把当前激活的执行路径持久化到：
+
+```bash
+~/.config/ralphx/current.env
+```
+
+这样 wrapper 命令保持稳定，而底层实际执行的版本化二进制放在 `~/.local/share/ralphx/releases/`。
+
+## 2. 预检
 
 先执行：
 
@@ -12,10 +36,9 @@ ralphx-doctor
 
 最低要求：
 - `codex` 可用
-- 如果从源码安装，需要 `go`
 - 如果要用 git 感知 gate，建议安装 `git`
 
-## 2. 准备输入
+## 3. 准备输入
 
 准备两类文件：
 - task file：描述总目标
@@ -26,18 +49,7 @@ ralphx-doctor
 - checklist = 硬剩余工作
 - checklist item 要短、边界清晰、便于验证
 
-好的 checklist 项：
-- 增加 command X
-- 更新 config loader
-- 加 smoke test
-- 更新 README 某节
-
-不好的 checklist 项：
-- 把所有事情做完
-- 修完所有问题
-- 变成生产可用
-
-## 3. 选择执行模式
+## 4. 选择执行模式
 
 ### 单 worker
 适合：
@@ -63,7 +75,7 @@ ralphx --task task.md --checklist task.checklist.md --workdir /repo --workers 3
 - 默认从 `--workers 1` 开始
 - 只有 checklist 确实可拆时才增加 worker 数
 
-## 4. 配置验证
+## 5. 配置验证
 
 尽量总是配置 `TESTS_CMD`。
 
@@ -81,7 +93,7 @@ export TESTS_CMD='bun test && bun run lint'
 export TESTS_CMD='pytest -q'
 ```
 
-## 5. 运行
+## 6. 运行
 
 典型生产调用：
 
@@ -93,7 +105,7 @@ export TESTS_CMD='go test ./...'
 ralphx   --task docs/tasks/release-task.md   --checklist docs/tasks/release-task.checklist.md   --workdir /path/to/repo   --workers 3
 ```
 
-## 6. 查看输出
+## 7. 查看输出
 
 关键文件：
 - `.ralphx/last-result.json`
@@ -108,38 +120,23 @@ ralphx   --task docs/tasks/release-task.md   --checklist docs/tasks/release-task
 - `in_progress`：工作仍剩余，或 complete 被降级
 - `blocked`：真实阻塞、无效输出、或验证失败
 
-## 7. 推进到 GitHub 前检查
+## 8. GitHub Release 推进 SOP
 
+打 tag 前检查：
 - `go build ./...`
 - `go test ./...`
 - `ralphx-doctor`
 - 跑一次单 worker smoke
 - 如果要用并行，再跑一次 `--workers` smoke
 - 检查 `.ralphx/last-result.json`
-- 如果 run 最终是 `complete`，确认 checklist 已全部打勾
 
-## 8. GitHub 推进 SOP
-
-推荐顺序：
+打 tag 并推送：
 
 ```bash
 git status
-go build ./...
-go test ./...
 git add .
-git commit -m "feat: productionize Go ralphx workflow"
+git commit -m "feat: release prep"
 git push origin main
+git tag v0.1.0
+git push origin v0.1.0
 ```
-
-## 9. 运行边界
-
-要做：
-- 用边界清晰的 checklist
-- 验证命令尽量便宜但有意义
-- blocked 时看结果文件和 logs
-- 先用较小 worker 数
-
-不要做：
-- 没 checklist 就上高并行
-- 把 worker 完成等同于总任务完成
-- 生产变更时完全跳过验证

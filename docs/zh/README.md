@@ -11,27 +11,26 @@
 
 `ralphx` 是一个基于 Go 的 Codex / coding agent 外层执行器。
 
-核心目标很简单：
+核心目标：
 - 让 agent 用当前工具持续推进，直到真实任务完成
 - 用 checklist / validation / leader gate 阻止过早完成
 - 在任务可拆分时支持本地多 worker 并行执行
 
-## 它现在能做什么
+## Release 安装（推荐）
 
-- 读取任务文件
-- 可选读取 checklist
-- 调用 `codex exec` 并要求严格 JSON 输出
-- 把运行状态落到 `.ralphx/`
-- 拒绝弱完成信号
-- 执行验证命令
-- 用 `--workers N` 把 checklist 项拆成并行 worker 任务
+正常使用不需要源码安装。
 
-## 安装
+安装最新 release：
 
 ```bash
-git clone https://github.com/ckken/ralphx.git
-cd ralphx
-./install.sh
+curl -fsSL https://github.com/ckken/ralphx/releases/latest/download/install.sh | bash
+ralphx-doctor
+```
+
+安装指定版本：
+
+```bash
+curl -fsSL https://github.com/ckken/ralphx/releases/download/v0.1.0/install.sh | VERSION=v0.1.0 bash
 ralphx-doctor
 ```
 
@@ -41,11 +40,27 @@ ralphx-doctor
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
+## 执行路径持久化
+
+安装器会把当前激活的执行路径持久化到：
+
+```bash
+~/.config/ralphx/current.env
+```
+
+下载下来的版本二进制会放在：
+
+```bash
+~/.local/share/ralphx/releases/
+```
+
+所以 `ralphx` / `ralphx-doctor` 始终是稳定入口，实际执行版本由持久化路径决定。
+
 ## 依赖
 
 必需：
-- `go`
 - `codex`
+- `curl` 或 `wget`
 
 建议：
 - `git`
