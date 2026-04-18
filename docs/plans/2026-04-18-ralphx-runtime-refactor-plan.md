@@ -1,101 +1,101 @@
-# ralphx Runtime Refactor Plan
+# ralphx Runtime 重构计划
 
-> For Hermes: this is the repo-tracked planning document for upgrading `ralphx` from a Codex-centric outer-loop runner into a pluggable, inspectable, validation-gated orchestration runtime.
+> 给 Hermes：这是仓库内跟踪的规划文档，用于将 `ralphx` 从一个以 Codex 为中心的外层循环执行器，升级为一个可插拔、可检查、由验证门控的编排运行时。
 
-**Goal:** land a staged refactor that preserves the current working CLI while upgrading `ralphx` into a multi-agent, policy-driven, observable runtime with durable state, stronger validation gates, and graphable architecture.
+**目标：** 通过分阶段重构，在保留当前可用 CLI 的前提下，将 `ralphx` 升级为一个多代理、策略驱动、可观测的运行时，具备持久化状态、更强的验证门控，以及可图谱化的架构。
 
-**Architecture:** keep the current Go codebase and `.ralphx` local-state model, but separate the code into four clearer layers: CLI/app entrypoints, orchestration/runtime policy, backend adapters, and state/reporting. The runner remains the authority for completion, retries, validation gates, and future parallel coordination.
+**架构：** 保留当前 Go 代码库和 `.ralphx` 本地状态模型，但将代码拆分为四个更清晰的层次：CLI / 应用入口、编排 / 运行时策略、后端适配器，以及状态 / 报告。Runner 仍然是完成判定、重试、验证门控以及未来并行协调的权威主体。
 
-**Tech Stack:** Go 1.19+, stdlib-first, Git worktree-based local parallelism later, JSON state files under `.ralphx/`, Mermaid for repo-native diagrams, GitHub for review/distribution.
+**技术栈：** Go 1.19+，优先标准库，后续采用基于 Git worktree 的本地并行，JSON 状态文件存放在 `.ralphx/` 下，使用 Mermaid 作为仓库原生图表方案，GitHub 用于审查与分发。
 
 ---
 
-## 1. Current baseline already present
+## 1. 当前已具备的基础
 
-The current repo already has the right bones:
+当前仓库已经具备了正确的骨架：
 
-- CLI entrypoints: `cmd/ralphx/main.go`, `cmd/ralphx-doctor/main.go`
-- Dispatch: `internal/cli/app.go`
-- Runner loop: `internal/runner/loop.go`
-- Single backend adapter: `internal/agent/codex.go`
-- Prompt assembly: `internal/prompt/builder.go`
-- Task loading: `internal/task/load.go`
-- Validation: `internal/validate/validate.go`
-- VCS snapshotting: `internal/vcs/git.go`
-- State persistence: `internal/state/*.go`
-- Parallel scaffolding: `internal/parallel/*.go`, `internal/state/parallel.go`
+- CLI 入口：`cmd/ralphx/main.go`、`cmd/ralphx-doctor/main.go`
+- 分发：`internal/cli/app.go`
+- Runner 循环：`internal/runner/loop.go`
+- 单一后端适配器：`internal/agent/codex.go`
+- Prompt 组装：`internal/prompt/builder.go`
+- 任务加载：`internal/task/load.go`
+- 验证：`internal/validate/validate.go`
+- VCS 快照：`internal/vcs/git.go`
+- 状态持久化：`internal/state/*.go`
+- 并行脚手架：`internal/parallel/*.go`、`internal/state/parallel.go`
 
-This means the refactor should be incremental, not a rewrite-from-scratch.
+这意味着此次重构应该是渐进式的，而不是一次推倒重写。
 
-## 2. Target outcomes
+## 2. 目标结果
 
-At the end of the staged refactor, `ralphx` should support:
+在分阶段重构结束时，`ralphx` 应当支持：
 
-1. **Pluggable agent backends**
+1. **可插拔的代理后端**
    - Codex
    - Claude Code
-   - Hermes / ACP-style backend
-   - future local/remote coding agents without runner rewrite
+   - Hermes / ACP 风格后端
+   - 未来的本地 / 远程编码代理，无需重写 runner
 
-2. **Policy-driven outer loop**
-   - explicit stop policy
-   - validation policy
-   - retry policy
-   - progress policy
-   - future parallel/merge policy
+2. **策略驱动的外层循环**
+   - 显式停止策略
+   - 验证策略
+   - 重试策略
+   - 进度策略
+   - 未来的并行 / 合并策略
 
-3. **Durable observable run model**
-   - run / round / worker / validation artifacts
-   - resume-friendly state
-   - clear stop reasons
-   - exportable summaries and graphs
+3. **持久化且可观测的运行模型**
+   - run / round / worker / validation 工件
+   - 便于恢复的状态
+   - 清晰的停止原因
+   - 可导出的摘要与图谱
 
-4. **Validation as a real gate**
-   - multi-step validation pipeline
-   - validation feedback injected into future rounds
-   - completion never delegated to the backend alone
+4. **将验证作为真正的门控**
+   - 多步骤验证流水线
+   - 将验证反馈注入后续轮次
+   - 完成判定绝不只委托给后端
 
-5. **Safe parallel path**
-   - worktree-based worker isolation
-   - result bundles
-   - merge / reject / fallback decisions owned by leader
-
----
-
-## 3. Architectural principles
-
-### 3.1 Runner owns truth
-Only the runner decides:
-- whether progress happened
-- whether the task is complete
-- whether to retry
-- whether to block/stop
-- whether parallel results are accepted
-
-### 3.2 Backends are adapters, not brains
-Each backend should only:
-- accept a normalized request
-- execute bounded work
-- return structured output + metadata
-
-All orchestration semantics stay outside the adapter.
-
-### 3.3 State is a product surface
-Files under `.ralphx/` are not debug junk. They are a durable contract for:
-- resuming runs
-- inspecting failures
-- exporting reports
-- building graph views
-
-### 3.4 Validation beats self-reported completion
-A backend saying `complete` is advisory. Completion only stands if runner gates pass.
-
-### 3.5 Parallelism must be isolated first
-No shared-workdir parallel writes. Use isolated worktrees before enabling real parallel execution.
+5. **安全的并行路径**
+   - 基于 worktree 的 worker 隔离
+   - 结果打包
+   - 合并 / 拒绝 / 回退决策由 leader 掌控
 
 ---
 
-## 4. Recommended target package shape
+## 3. 架构原则
+
+### 3.1 Runner 掌握真相
+只有 runner 决定：
+- 是否发生了进展
+- 任务是否完成
+- 是否需要重试
+- 是否需要阻塞 / 停止
+- 是否接受并行结果
+
+### 3.2 后端是适配器，不是大脑
+每个后端只应当：
+- 接收标准化请求
+- 执行有边界的工作
+- 返回结构化输出和元数据
+
+所有编排语义都应保留在适配器之外。
+
+### 3.3 状态本身就是产品界面
+`.ralphx/` 下的文件不是调试垃圾。它们是以下能力的持久化契约：
+- 恢复运行
+- 检查失败原因
+- 导出报告
+- 构建图谱视图
+
+### 3.4 验证优先于自报完成
+后端声称 `complete` 只能作为参考。只有当 runner 的门控检查通过时，完成判定才成立。
+
+### 3.5 并行必须先实现隔离
+不要在共享 workdir 上进行并行写入。必须先使用隔离的 worktree，再启用真正的并行执行。
+
+---
+
+## 4. 推荐的目标包结构
 
 ```text
 cmd/
@@ -164,25 +164,25 @@ internal/
 
 ---
 
-## 5. Staged implementation plan
+## 5. 分阶段实施计划
 
-## Phase 0 — stabilize contracts without changing behavior
+## Phase 0 — 在不改变行为的前提下稳定契约
 
-**Objective:** keep current CLI behavior, but reduce coupling and make future changes cheap.
+**目标：** 保持当前 CLI 行为不变，但降低耦合，使未来改动成本更低。
 
-### Scope
-- keep `ralphx run` working as-is
-- preserve current Codex path
-- preserve current `.ralphx` outputs
-- introduce clearer domain types and stop reasons
+### 范围
+- 保持 `ralphx run` 按现状工作
+- 保留当前 Codex 路径
+- 保留当前 `.ralphx` 输出
+- 引入更清晰的领域类型和停止原因
 
-### Deliverables
-- stronger `Agent` interface in `internal/agent/interface.go`
-- explicit runtime/domain types for run/round/progress/validation
-- normalized `RoundOutcome` derived from backend result + runner checks
-- standard stop reason taxonomy
+### 交付物
+- 在 `internal/agent/interface.go` 中强化 `Agent` 接口
+- 为 run / round / progress / validation 定义显式运行时 / 领域类型
+- 基于后端结果 + runner 检查得出标准化的 `RoundOutcome`
+- 标准的停止原因分类体系
 
-### Files likely to change
+### 可能变更的文件
 - `internal/agent/interface.go`
 - `internal/contracts/result.go`
 - `internal/runner/loop.go`
@@ -190,43 +190,43 @@ internal/
 - `internal/state/store.go`
 - `internal/config/config.go`
 
-### Validation
+### 验证
 ```bash
 go test ./...
 go build ./...
 ```
 
-### Acceptance
-- current commands still work
-- no behavior regression in current Codex path
-- stop reasons are explicit and serialized
+### 验收标准
+- 当前命令仍然可用
+- 当前 Codex 路径无行为回归
+- 停止原因是显式的，并且可序列化
 
 ---
 
-## Phase 1 — pluggable backend runtime
+## Phase 1 — 可插拔后端运行时
 
-**Objective:** turn `ralphx` from a Codex-specific runner into a backend-neutral orchestration runtime.
+**目标：** 将 `ralphx` 从一个 Codex 专用 runner，转变为后端无关的编排运行时。
 
-### Scope
-- backend registry / factory
-- backend capabilities model
-- backend-specific adapters hidden behind shared interface
-- modular prompt assembly
+### 范围
+- 后端注册表 / 工厂
+- 后端能力模型
+- 将后端专有适配器隐藏在共享接口之后
+- 模块化 Prompt 组装
 
-### Deliverables
+### 交付物
 - `internal/agent/factory.go`
 - `internal/agent/claudecode.go`
 - `internal/agent/hermes.go`
-- backend capabilities struct
-- modular prompt sections
+- 后端能力结构体
+- 模块化 Prompt section
 
-### Files likely to change
+### 可能变更的文件
 - `internal/agent/*`
 - `internal/prompt/builder.go`
 - `internal/config/config.go`
 - `internal/runner/loop.go`
 
-### Validation
+### 验证
 ```bash
 go test ./...
 go build ./...
@@ -234,75 +234,75 @@ ralphx --help
 ralphx doctor
 ```
 
-### Acceptance
-- backend can be selected by config/flag
-- runner logic does not branch on backend-specific details
-- prompt builder can assemble shared and backend-specific sections cleanly
+### 验收标准
+- 可通过配置 / 参数选择后端
+- runner 逻辑不再基于后端细节分支
+- prompt builder 能够清晰地组装共享 section 与后端专属 section
 
 ---
 
-## Phase 2 — validation as a first-class gate
+## Phase 2 — 将验证提升为一等门控
 
-**Objective:** prevent false progress and fake completion.
+**目标：** 防止虚假进展与伪完成。
 
-### Scope
-- multi-step validation pipeline
-- validation report artifacts per round
-- progress scoring derived from real signals
-- failure feedback injected into next round
+### 范围
+- 多步骤验证流水线
+- 每轮的验证报告工件
+- 从真实信号推导进度评分
+- 将失败反馈注入下一轮
 
-### Deliverables
+### 交付物
 - `internal/validate/pipeline.go`
 - `internal/validate/steps.go`
 - `internal/runner/progress.go`
-- validation report schema
-- feedback injection into prompt assembly
+- 验证报告 schema
+- 将反馈注入 prompt 组装流程
 
-### Files likely to change
+### 可能变更的文件
 - `internal/validate/*`
 - `internal/runner/loop.go`
 - `internal/prompt/*`
 - `internal/state/*`
 
-### Validation
+### 验证
 ```bash
 go test ./...
 go build ./...
 ```
 
-### Acceptance
-- multiple validation steps can run sequentially
-- each step is recorded with status/output/duration
-- next round can consume structured failure summary
-- completion requires runner-side validation success
+### 验收标准
+- 可顺序执行多个验证步骤
+- 每个步骤都会记录状态 / 输出 / 时长
+- 下一轮可以消费结构化失败摘要
+- 完成判定必须要求 runner 侧验证成功
 
 ---
 
-## Phase 3 — inspectability, resume, and exports
+## Phase 3 — 可检查性、恢复与导出
 
-**Objective:** make runs understandable and operable.
+**目标：** 使运行过程可理解、可操作。
 
-### Scope
-- `status`, `resume`, `inspect`, `logs` commands
-- round artifacts under `.ralphx/rounds/`
-- human-readable summary + machine-readable export
-- graph/export layer for repo analysis and docs
+### 范围
+- `status`、`resume`、`inspect`、`logs` 命令
+- `.ralphx/rounds/` 下的轮次工件
+- 人类可读摘要 + 机器可读导出
+- 面向仓库分析和文档的图谱 / 导出层
 
-### Deliverables
+### 交付物
 - `internal/app/status.go`
 - `internal/app/resume.go`
 - `internal/report/*`
-- round artifact layout
-- graph export commands or report generators
+- 轮次工件布局
+- 图谱导出命令或报告生成器
 
-### Files likely to change
+### 可能变更的文件
 - `internal/cli/app.go`
 - `internal/state/*`
 - `internal/report/*`
 - `README.md`
-- docs under `docs/en/` and `docs/zh/`
+- `docs/zh/` 下的文档
 
-### Validation
+### 验证
 ```bash
 go test ./...
 go build ./...
@@ -310,146 +310,146 @@ ralphx status --help
 ralphx resume --help
 ```
 
-### Acceptance
-- users can inspect current/previous runs without reading raw JSON manually
-- artifacts are stable enough to drive diagrams and future UI
+### 验收标准
+- 用户无需手动读取原始 JSON 也能检查当前 / 过往运行
+- 工件足够稳定，可驱动图表与未来 UI
 
 ---
 
-## Phase 4 — safe local parallelism
+## Phase 4 — 安全的本地并行
 
-**Objective:** turn current parallel scaffolding into a production-grade local parallel mode.
+**目标：** 将当前的并行脚手架升级为生产级本地并行模式。
 
-### Scope
-- worktree isolation
-- worker assignment protocol
-- result bundles
-- merge / reject / fallback decisions
-- conflict handling and downgrade path
+### 范围
+- worktree 隔离
+- worker 分配协议
+- 结果打包
+- 合并 / 拒绝 / 回退决策
+- 冲突处理与降级路径
 
-### Deliverables
+### 交付物
 - `internal/vcs/worktree.go`
 - `internal/parallel/planner.go`
 - `internal/parallel/merger.go`
-- worker result bundle schema
-- conflict report format
+- worker 结果 bundle schema
+- 冲突报告格式
 
-### Files likely to change
+### 可能变更的文件
 - `internal/parallel/*`
 - `internal/state/parallel.go`
 - `internal/runner/loop.go`
 - `internal/vcs/*`
 
-### Validation
+### 验证
 ```bash
 go test ./...
 go build ./...
 ```
 
-### Acceptance
-- at least two workers can run in isolated worktrees
-- leader remains sole authority for completion
-- conflicting worker results can be rejected or downgraded safely
+### 验收标准
+- 至少两个 worker 能在隔离的 worktree 中运行
+- leader 仍是完成判定的唯一权威
+- 冲突的 worker 结果可以被安全地拒绝或降级
 
 ---
 
-## 6. Priority order (ROI first)
+## 6. 优先级顺序（先看 ROI）
 
-1. agent interface + backend factory
-2. validation pipeline
-3. run/round/result schema cleanup
+1. agent 接口 + 后端工厂
+2. 验证流水线
+3. run / round / result schema 清理
 4. status / resume / inspect / logs
-5. prompt feedback loop
-6. worktree-based parallelism
+5. prompt 反馈回路
+6. 基于 worktree 的并行
 
-If scope must be cut, cut parallelism first, not contracts/validation.
-
----
-
-## 7. Concrete migration checklist
-
-### Milestone A: contracts and boundaries
-- [ ] normalize `AgentRequest` / `AgentResponse`
-- [ ] define stop reasons enum/constants
-- [ ] split backend output from runner outcome
-- [ ] add run/round identifiers where missing
-
-### Milestone B: backend neutrality
-- [ ] add backend factory
-- [ ] keep Codex as first adapter through new interface
-- [ ] add capability flags
-- [ ] make prompt builder backend-neutral
-
-### Milestone C: stronger gates
-- [ ] support multi-step validation
-- [ ] persist validation report per round
-- [ ] compute progress from checklist + diff + validation, not backend claim alone
-- [ ] inject failures into next round prompt
-
-### Milestone D: inspectability
-- [ ] add round artifact folders
-- [ ] add `status`/`resume`/`inspect`
-- [ ] add exportable summaries
-- [ ] generate diagrams from live structure/artifacts
-
-### Milestone E: safe parallel execution
-- [ ] create worktree per worker
-- [ ] define worker result bundle
-- [ ] implement merge/reject/fallback flow
-- [ ] add conflict report output
+如果必须砍范围，优先砍并行，不要砍契约 / 验证。
 
 ---
 
-## 8. Risks and tradeoffs
+## 7. 具体迁移清单
 
-### Risk: over-design before backend parity
-Mitigation: keep Phase 0 small and behavior-preserving.
+### Milestone A：契约与边界
+- [ ] 标准化 `AgentRequest` / `AgentResponse`
+- [ ] 定义停止原因 enum / 常量
+- [ ] 将后端输出与 runner 结果拆分
+- [ ] 在缺失处补充 run / round 标识符
 
-### Risk: parallel mode destabilizes the repo
-Mitigation: require isolated worktrees before enabling multi-worker writes.
+### Milestone B：后端中立
+- [ ] 添加后端工厂
+- [ ] 通过新接口保留 Codex 作为首个适配器
+- [ ] 添加能力标记
+- [ ] 使 prompt builder 与后端无关
 
-### Risk: state schema drifts too fast
-Mitigation: version JSON artifacts and document them.
+### Milestone C：更强的门控
+- [ ] 支持多步骤验证
+- [ ] 为每轮持久化验证报告
+- [ ] 根据 checklist + diff + validation 计算进度，而不是只依赖后端声明
+- [ ] 将失败信息注入下一轮 prompt
 
-### Risk: validation becomes too heavy
-Mitigation: support required vs optional steps and fail-fast configuration.
+### Milestone D：可检查性
+- [ ] 添加轮次工件目录
+- [ ] 添加 `status` / `resume` / `inspect`
+- [ ] 添加可导出的摘要
+- [ ] 从实时结构 / 工件生成图表
 
-### Tradeoff: more artifacts vs more disk usage
-Worth it. Inspectability and replayability are core features, not extras.
+### Milestone E：安全并行执行
+- [ ] 为每个 worker 创建 worktree
+- [ ] 定义 worker 结果 bundle
+- [ ] 实现合并 / 拒绝 / 回退流程
+- [ ] 添加冲突报告输出
 
 ---
 
-## 9. Suggested repo deliverables for this planning pass
+## 8. 风险与权衡
 
-This planning pass should land repo-tracked documentation, not code changes to the runtime itself:
+### 风险：在实现后端等价能力前过度设计
+缓解：保持 Phase 0 小而精，并确保行为不变。
 
-- plan doc: `docs/plans/2026-04-18-ralphx-runtime-refactor-plan.md`
-- graph atlas (English): `docs/en/refactor-graph-atlas.md`
-- graph atlas (中文): `docs/zh/refactor-graph-atlas.md`
-- README quick links updated to point to the new docs
+### 风险：并行模式破坏仓库稳定性
+缓解：在启用多 worker 写入前，强制要求隔离 worktree。
+
+### 风险：状态 schema 漂移过快
+缓解：为 JSON 工件加版本，并做好文档说明。
+
+### 风险：验证变得过于沉重
+缓解：支持必需步骤与可选步骤，并提供 fail-fast 配置。
+
+### 权衡：更多工件 vs 更多磁盘占用
+值得。可检查性与可重放性是核心特性，不是附加功能。
 
 ---
 
-## 10. Verification for this docs-only pass
+## 9. 本轮规划建议提交到仓库的交付物
 
-Run after landing the docs:
+本轮规划应提交仓库跟踪文档，而不是直接修改运行时代码：
+
+- 计划文档：`docs/plans/2026-04-18-ralphx-runtime-refactor-plan.md`
+- 图谱总览：`docs/zh/refactor-graph-atlas.md`
+- 中文主入口：`docs/zh/README.md`
+- 更新 README 快速链接，指向新的文档
+
+---
+
+## 10. 本轮仅文档变更的验证
+
+文档落库后运行：
 
 ```bash
 git diff --stat
 ```
 
-Review manually that:
-- the plan is concrete enough to implement against
-- every graph renders as Mermaid on GitHub
-- English and Chinese docs point to the same conceptual artifacts
-- README quick links expose the new planning/graph docs
+手动检查以下事项：
+- 该计划足够具体，可以据此实施
+- 每个图都能在 GitHub 上作为 Mermaid 正常渲染
+- 仓库文档统一以中文主入口承载同一套概念与图谱
+- README 快速链接已暴露新的规划 / 图谱文档
 
 ---
 
-## 11. Definition of done for this planning pass
+## 11. 本轮规划完成定义
 
-This pass is complete when:
-- the repo contains a staged refactor plan checked into `docs/plans/`
-- the repo contains graph/chain docs checked into `docs/en/` and `docs/zh/`
-- quick links surface the new docs
-- all changes are committed and pushed to the user’s GitHub repository
+当满足以下条件时，本轮工作即视为完成：
+- 仓库中包含提交到 `docs/plans/` 的分阶段重构计划
+- 仓库中包含提交到 `docs/zh/` 的图谱 / 链路文档
+- 快速链接已展示这些新文档
+- 所有变更都已提交并推送到用户的 GitHub 仓库

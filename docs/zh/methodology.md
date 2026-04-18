@@ -31,7 +31,7 @@
 - `complete` 会被拒绝
 - 并行 worker 做完局部也不能直接结束总任务
 
-### 3. Validation-first
+### 3. 验证优先
 
 建议总是配置 `TESTS_CMD`。
 
@@ -40,6 +40,6 @@
 - `bun test && bun run lint`
 - `pytest -q`
 
-### 4. Parallel mode discipline
+### 4. 并行模式纪律
 
 并行模式适合“边界清晰的 checklist 拆分”，不适合无边界乱 swarm。
