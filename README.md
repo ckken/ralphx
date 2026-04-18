@@ -8,6 +8,8 @@ Quick links:
 - [Production SOP](docs/en/production-sop.md)
 - [Parallel protocol v0](docs/en/go-parallel-protocol-v0.md)
 - [Flowcharts / Chain Diagram](docs/en/architecture.md)
+- [Runtime refactor plan](docs/plans/2026-04-18-ralphx-runtime-refactor-plan.md)
+- [Refactor graph atlas](docs/en/refactor-graph-atlas.md)
 
 `ralphx` is a Go-based outer-loop runner for Codex and coding agents.
 

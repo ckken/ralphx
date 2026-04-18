@@ -2,6 +2,14 @@
 
 [English](../../README.md) | [中文](README.md)
 
+快速入口：
+- [安装说明](installation.md)
+- [方法论](methodology.md)
+- [生产 SOP](production-sop.md)
+- [流程图 / 链路图](architecture.md)
+- [Runtime 重构计划](../plans/2026-04-18-ralphx-runtime-refactor-plan.md)
+- [重构图谱总览](refactor-graph-atlas.md)
+
 `ralphx` 是一个基于 Go 的 Codex / coding agent 外层执行器。
 
 ## Release 安装（推荐）
