@@ -13,7 +13,7 @@ curl -fsSL https://github.com/ckken/ralphx/releases/latest/download/install.sh |
 安装指定版本：
 
 ```bash
-curl -fsSL https://github.com/ckken/ralphx/releases/download/v0.1.2/install.sh | VERSION=v0.1.2 bash
+curl -fsSL https://github.com/ckken/ralphx/releases/download/v0.2.3/install.sh | VERSION=v0.2.3 bash
 ```
 
 安装器会下载 `SHA256SUMS`，校验通过后才激活二进制。
@@ -27,6 +27,14 @@ ralphx skill install
 ralphx skill install --project
 ```
 
+可选：只有在明确需要 delegation 时，才发现或安装精选 subagent 集：
+
+```bash
+ralphx agents discover
+ralphx agents install
+ralphx agents install --project
+```
+
 你也可以通过 CLI 安装或卸载 hooks：
 
 ```bash
@@ -38,6 +46,7 @@ ralphx hook uninstall
 
 ```bash
 ralphx doctor
+ralphx doctor --json
 ralphx --help
 ralphx version
 ralphx current
@@ -62,3 +71,11 @@ ralphx replan --task tasks/migration.md
 ```bash
 ralphx run --task tasks/migration.md --resume --session-expiry 24h
 ```
+
+在新的 Codex session 里激活工作流：
+
+```text
+$ralphx
+```
+
+如果刚修改过 hooks，先开一个新 session 再测试这个 prompt，这样 `UserPromptSubmit` 才会触发。

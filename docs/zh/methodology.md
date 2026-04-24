@@ -2,6 +2,9 @@
 
 `ralphx` 是一个基于 Go 的 Codex / coding agent 外层执行器。
 
+在 GPT-5.5 时代，`ralphx` 不是“让模型更聪明”的层。
+它是模型外侧的执行契约：状态、checklist gate、验证证据、Stop hook 续跑、resume 和 replan。
+
 核心方法：
 
 1. task file 是总目标真源。
@@ -10,7 +13,7 @@
 4. 运行状态落到 `.ralphx/`。
 5. 由 leader 侧拒绝过早完成。
 6. 配置了 `TESTS_CMD` 时，每轮进展后执行验证。
-7. 并行模式下，worker 只负责局部 slice，总完成只能由 leader 判定。
+7. delegation / worker 流程只在明确需要时使用，总完成只能由 leader 判定。
 
 ## 核心原则
 
@@ -29,7 +32,7 @@
 只要 checklist 还有未完成项：
 - 单个 slice 做完不代表总任务完成
 - `complete` 会被拒绝
-- 并行 worker 做完局部也不能直接结束总任务
+- delegated worker 做完局部也不能直接结束总任务
 
 ### 3. Validation-first
 
@@ -40,6 +43,6 @@
 - `bun test && bun run lint`
 - `pytest -q`
 
-### 4. Parallel mode discipline
+### 4. Delegation discipline
 
-并行模式适合“边界清晰的 checklist 拆分”，不适合无边界乱 swarm。
+delegation 适合“边界清晰的 checklist 拆分”，不适合无边界乱 swarm。

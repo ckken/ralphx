@@ -1,4 +1,4 @@
 interface:
   display_name: "ralphx"
   short_description: "Outer-loop workflow for pushing repo tasks"
-  default_prompt: "Use $ralphx to keep pushing this repo task to completion with checklist and validation discipline."
+  default_prompt: "Use $ralphx to keep this repo task moving until the checklist, validation evidence, and runtime state all agree it is complete. Treat GPT-5.5 as the reasoning layer and ralphx as the execution-discipline layer."

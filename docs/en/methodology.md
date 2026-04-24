@@ -2,6 +2,9 @@
 
 `ralphx` is a Go-based outer-loop runner for Codex and coding agents.
 
+For GPT-5.5-era Codex sessions, `ralphx` is not a "make the model smarter" layer.
+It is the execution contract around the model: state, checklist gates, validation evidence, Stop-hook continuation, resume, and replan.
+
 Its method is simple:
 
 1. Treat the task file as the source of truth.
@@ -10,7 +13,7 @@ Its method is simple:
 4. Persist local runtime state under `.ralphx/`.
 5. Reject premature completion on the leader side.
 6. Run validation between iterations when configured.
-7. In parallel mode, let workers execute bounded checklist slices while the leader remains the only authority for total completion.
+7. Keep optional worker/subagent flows behind explicit delegation; the leader remains the only authority for total completion.
 
 ## Core principles
 
@@ -31,7 +34,7 @@ Unchecked checklist items are treated as real remaining work.
 That means:
 - a local slice can finish without ending the total task
 - `complete` is rejected while checklist items remain
-- in parallel mode, workers can finish slices but only the leader can end the run
+- delegated workers can finish slices, but only the leader can end the run
 
 ### 3. Validation-first progression
 
@@ -49,9 +52,9 @@ Typical validation:
 - but no meaningful progress exists, or
 - checklist items still remain
 
-### 5. Parallel mode discipline
+### 5. Delegation discipline
 
-Parallel mode is for bounded checklist decomposition, not unconstrained swarming.
+Delegation is for bounded checklist decomposition, not unconstrained swarming.
 
 Use `--workers N` only when:
 - checklist items are separable

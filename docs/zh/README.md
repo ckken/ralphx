@@ -2,7 +2,23 @@
 
 [English](../../README.md) | [中文](README.md)
 
+快速链接：
+- [安装说明](installation.md)
+- [方法论](methodology.md)
+- [生产 SOP](production-sop.md)
+- [并行协议 v0](../en/go-parallel-protocol-v0.md)
+- [架构与链路图](architecture.md)
+- [Codex 自循环机制](../en/codex-self-loop.md)
+
 `ralphx` 是一个基于 Go 的 Codex / coding agent 外层执行器。
+
+## GPT-5.5 下的定位
+
+GPT-5.5 提升的是推理和编码质量，但不会自动替代执行纪律。
+`ralphx` 负责模型外侧的运行时约束：本地状态、checklist gate、验证 gate、Stop hook 续跑、session resume 和停滞后的 replan。
+
+长任务、发布任务、多轮修复、必须“做完才能停”的任务适合用 `ralphx`。
+普通一次性改动直接用 Codex 通常足够。
 
 ## Release 安装（推荐）
 
@@ -18,7 +34,7 @@ ralphx doctor
 安装指定版本：
 
 ```bash
-curl -fsSL https://github.com/ckken/ralphx/releases/download/v0.1.2/install.sh | VERSION=v0.1.2 bash
+curl -fsSL https://github.com/ckken/ralphx/releases/download/v0.2.3/install.sh | VERSION=v0.2.3 bash
 ralphx doctor
 ```
 
@@ -31,6 +47,14 @@ ralphx doctor
 ```bash
 ralphx skill install
 ralphx skill install --project
+```
+
+可选：只有在明确需要 delegation 时，才发现或安装精选 subagent 集：
+
+```bash
+ralphx agents discover
+ralphx agents install
+ralphx agents install --project
 ```
 
 你也可以通过 CLI 安装或卸载 hooks：
@@ -71,3 +95,11 @@ ralphx replan --task tasks/migration.md
 ```bash
 ralphx run --task tasks/migration.md --resume --session-expiry 24h
 ```
+
+在新的 Codex session 里激活工作流：
+
+```text
+$ralphx
+```
+
+如果刚修改过 hooks，先开一个新 session，再提交 `$ralphx`，这样 `UserPromptSubmit` 才会触发。

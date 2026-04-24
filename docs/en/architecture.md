@@ -60,3 +60,9 @@ flowchart LR
 - The process flow explains control logic.
 - The component chain explains what files and tools participate in the loop.
 - Together they make the method easier to adopt in another repository.
+
+## Codex Self-Loop via Stop Hook
+
+The loop control is not implemented as a `while(true)` in ralphx. Instead, Codex itself drives the loop turn by turn, and ralphx intercepts every **Stop** decision via a native Codex hook.
+
+See [Codex Self-Loop Mechanism](codex-self-loop.md) for the full explanation, including the Stop Guard priority chain, the block response shape, and the comparison with polling-loop architectures.

@@ -13,7 +13,7 @@ curl -fsSL https://github.com/ckken/ralphx/releases/latest/download/install.sh |
 Install a specific version:
 
 ```bash
-curl -fsSL https://github.com/ckken/ralphx/releases/download/v0.1.2/install.sh | VERSION=v0.1.2 bash
+curl -fsSL https://github.com/ckken/ralphx/releases/download/v0.2.3/install.sh | VERSION=v0.2.3 bash
 ```
 
 The installer downloads `SHA256SUMS` and verifies the release binaries before activating them.
@@ -27,6 +27,14 @@ ralphx skill install
 ralphx skill install --project
 ```
 
+Optional: discover or install the curated subagent set when a task is explicitly delegated:
+
+```bash
+ralphx agents discover
+ralphx agents install
+ralphx agents install --project
+```
+
 You can also install or refresh the hooks from the CLI:
 
 ```bash
@@ -38,6 +46,7 @@ ralphx hook uninstall
 
 ```bash
 ralphx doctor
+ralphx doctor --json
 ralphx --help
 ralphx version
 ralphx current
@@ -62,3 +71,11 @@ Resume a fresh-enough Codex session:
 ```bash
 ralphx run --task tasks/migration.md --resume --session-expiry 24h
 ```
+
+Activate the workflow in a fresh Codex session:
+
+```text
+$ralphx
+```
+
+If you just changed hooks, start a new session before testing the prompt so `UserPromptSubmit` can fire.

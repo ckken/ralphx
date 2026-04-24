@@ -16,8 +16,8 @@ Goal: add an OMX-style control layer above the current runner so `ralphx` can in
 - [x] Add hook event vocabulary under `internal/hooks`
 - [x] Add stop/session-end guard evaluator
 - [x] Add tests for incomplete-work, missing-verification, and clean-complete outcomes
-- [ ] Wire the stop guard into a real hook entrypoint
-- [ ] Persist hook decisions into `.ralphx/state.json`
+- [x] Wire the stop guard into a real hook entrypoint
+- [x] Persist hook decisions into `.ralphx/state.json`
 
 ## Recommended Wiring Order
 
