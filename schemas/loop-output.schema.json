@@ -4,16 +4,23 @@
   "additionalProperties": false,
   "required": [
     "status",
+    "mode",
     "exit_signal",
     "files_modified",
     "tests_passed",
     "blockers",
-    "summary"
+    "summary",
+    "next_step",
+    "checklist_update"
   ],
   "properties": {
     "status": {
       "type": "string",
       "enum": ["in_progress", "blocked", "complete"]
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["execute_next_step", "produce_plan", "blocked", "complete"]
     },
     "exit_signal": {
       "type": "boolean"
@@ -33,6 +40,15 @@
     },
     "summary": {
       "type": "string"
+    },
+    "next_step": {
+      "type": "string"
+    },
+    "checklist_update": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     }
   }
 }

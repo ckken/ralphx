@@ -71,8 +71,7 @@ func (l Loop) Run(ctx context.Context) error {
 
 	for {
 		if l.Config.MaxIterations > 0 && iteration > l.Config.MaxIterations {
-			fmt.Printf("[%s] Stopping after reaching MAX_ITERATIONS=%d\n", ts(time.Now()), l.Config.MaxIterations)
-			break
+			return fmt.Errorf("stopping after reaching MAX_ITERATIONS=%d before task completion", l.Config.MaxIterations)
 		}
 
 		if !l.Config.ResumeSession || !state.SessionFresh(session, l.Config.SessionExpiry, time.Now()) {
@@ -191,7 +190,6 @@ func (l Loop) Run(ctx context.Context) error {
 		}
 		iteration++
 	}
-	return nil
 }
 
 func (l Loop) runIteration(ctx context.Context, iteration int, bundle task.Bundle, template, schemaPath string, paths state.Paths, session state.SessionMeta) (roundExecution, state.SessionMeta, error) {
@@ -386,7 +384,13 @@ func (l Loop) tryAutoReplan(ctx context.Context, paths state.Paths, reason strin
 	if err := plan.EnsureLogDir(rawLogPath); err != nil {
 		return false, nil, err
 	}
-	outcome, _, _, err := plan.Replan(ctx, plan.ReplanRequest{
+	replanTimeout := l.Config.RoundTimeout
+	if replanTimeout <= 0 {
+		replanTimeout = 30 * time.Minute
+	}
+	replanCtx, cancel := context.WithTimeout(ctx, replanTimeout)
+	defer cancel()
+	outcome, _, _, err := plan.Replan(replanCtx, plan.ReplanRequest{
 		TaskPath:          l.Config.TaskFile,
 		ChecklistPath:     l.Config.ChecklistFile,
 		SummaryPath:       paths.SummaryFile,

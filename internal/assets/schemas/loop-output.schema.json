@@ -9,7 +9,9 @@
     "files_modified",
     "tests_passed",
     "blockers",
-    "summary"
+    "summary",
+    "next_step",
+    "checklist_update"
   ],
   "properties": {
     "status": {
@@ -48,44 +50,5 @@
         "type": "string"
       }
     }
-  },
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "status": { "const": "in_progress" },
-          "mode": { "const": "execute_next_step" }
-        }
-      },
-      "then": {
-        "properties": {
-          "files_modified": { "type": "integer", "minimum": 1 }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "status": { "const": "in_progress" },
-          "mode": { "const": "produce_plan" }
-        }
-      },
-      "then": {
-        "anyOf": [
-          {
-            "required": ["next_step"],
-            "properties": {
-              "next_step": { "type": "string", "minLength": 1 }
-            }
-          },
-          {
-            "required": ["checklist_update"],
-            "properties": {
-              "checklist_update": { "type": "array", "minItems": 1 }
-            }
-          }
-        ]
-      }
-    }
-  ]
+  }
 }

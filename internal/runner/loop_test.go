@@ -1,11 +1,14 @@
 package runner
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/ckken/ralphx/internal/agent"
 	"github.com/ckken/ralphx/internal/config"
 	"github.com/ckken/ralphx/internal/contracts"
 	"github.com/ckken/ralphx/internal/state"
@@ -72,4 +75,85 @@ func TestApplyProducePlanWritesTaskAndChecklist(t *testing.T) {
 	if !strings.Contains(string(checklistData), "done one") {
 		t.Fatalf("checklist lost completed item: %q", string(checklistData))
 	}
+}
+
+func TestTryAutoReplanUsesRoundTimeout(t *testing.T) {
+	dir := t.TempDir()
+	taskPath := filepath.Join(dir, "task.md")
+	checklistPath := filepath.Join(dir, "task.checklist.md")
+	if err := os.WriteFile(taskPath, []byte("# Task\n\nShip it.\n"), 0o644); err != nil {
+		t.Fatalf("write task: %v", err)
+	}
+	if err := os.WriteFile(checklistPath, []byte("- [ ] one\n"), 0o644); err != nil {
+		t.Fatalf("write checklist: %v", err)
+	}
+	fakeCodex := filepath.Join(dir, "fake-codex.sh")
+	if err := os.WriteFile(fakeCodex, []byte("#!/usr/bin/env bash\nsleep 5\n"), 0o755); err != nil {
+		t.Fatalf("write fake codex: %v", err)
+	}
+	paths := state.DerivePaths(dir, filepath.Join(dir, ".ralphx"))
+	if err := paths.Ensure(); err != nil {
+		t.Fatalf("ensure state paths: %v", err)
+	}
+
+	loop := Loop{Config: config.RunConfig{
+		TaskFile:      taskPath,
+		ChecklistFile: checklistPath,
+		Workdir:       dir,
+		StateDir:      paths.Root,
+		CodexCmd:      fakeCodex,
+		AutoReplan:    true,
+		RoundTimeout:  20 * time.Millisecond,
+	}}
+	start := time.Now()
+	replanned, guidance, err := loop.tryAutoReplan(context.Background(), paths, "timeout_test")
+	if err == nil {
+		t.Fatal("tryAutoReplan() error = nil, want timeout")
+	}
+	if replanned || guidance != nil {
+		t.Fatalf("replanned=%t guidance=%#v, want no result", replanned, guidance)
+	}
+	if time.Since(start) > time.Second {
+		t.Fatalf("tryAutoReplan ignored RoundTimeout; elapsed=%s", time.Since(start))
+	}
+}
+
+func TestRunReturnsErrorWhenMaxIterationsReachedBeforeCompletion(t *testing.T) {
+	dir := t.TempDir()
+	taskPath := filepath.Join(dir, "task.md")
+	if err := os.WriteFile(taskPath, []byte("# Task\n\nKeep working.\n"), 0o644); err != nil {
+		t.Fatalf("write task: %v", err)
+	}
+	loop := Loop{
+		Config: config.RunConfig{
+			TaskFile:      taskPath,
+			Workdir:       dir,
+			StateDir:      filepath.Join(dir, ".ralphx"),
+			MaxIterations: 1,
+			MaxNoProgress: 0,
+			RoundTimeout:  time.Second,
+			AutoReplan:    false,
+		},
+		Agent: staticAgent{result: contracts.RoundResult{
+			Status:        contracts.StatusInProgress,
+			Mode:          contracts.ModeExecuteNextStep,
+			ExitSignal:    false,
+			FilesModified: 1,
+			TestsPassed:   false,
+			Blockers:      nil,
+			Summary:       "one bounded step remains",
+		}},
+	}
+	err := loop.Run(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "MAX_ITERATIONS=1") {
+		t.Fatalf("Run() error = %v, want MAX_ITERATIONS error", err)
+	}
+}
+
+type staticAgent struct {
+	result contracts.RoundResult
+}
+
+func (a staticAgent) Run(context.Context, agent.Request) (agent.Response, error) {
+	return agent.Response{Parsed: a.result}, nil
 }
