@@ -9,6 +9,16 @@ type RunState struct {
 	ChecklistFile string                `json:"checklist_file,omitempty"`
 	Result        contracts.RoundResult `json:"result"`
 	Guidance      *Guidance             `json:"guidance,omitempty"`
+	Hook          *HookState            `json:"hook,omitempty"`
+}
+
+type HookState struct {
+	Event     string `json:"event"`
+	Allow     bool   `json:"allow"`
+	Reason    string `json:"reason"`
+	Message   string `json:"message"`
+	Result    any    `json:"result,omitempty"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 type Guidance struct {

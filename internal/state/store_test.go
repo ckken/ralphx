@@ -52,3 +52,29 @@ func TestWriteStateWithGuidance(t *testing.T) {
 		t.Fatalf("guidance = %#v", runState.Guidance)
 	}
 }
+
+func TestWriteRunState(t *testing.T) {
+	dir := t.TempDir()
+	paths := DerivePaths(dir, filepath.Join(dir, ".ralphx"))
+	runState := RunState{
+		Iteration: 2,
+		UpdatedAt: "2026-01-02 15:04:05",
+		Hook: &HookState{
+			Event:     "stop",
+			Allow:     false,
+			Reason:    "task_incomplete",
+			Message:   "Continue the current branch of work.",
+			UpdatedAt: "2026-01-02T15:04:05Z",
+		},
+	}
+	if err := WriteRunState(paths, runState); err != nil {
+		t.Fatalf("WriteRunState() error = %v", err)
+	}
+	loaded, err := LoadRunState(paths)
+	if err != nil {
+		t.Fatalf("LoadRunState() error = %v", err)
+	}
+	if loaded.Hook == nil || loaded.Hook.Reason != "task_incomplete" {
+		t.Fatalf("hook = %#v", loaded.Hook)
+	}
+}

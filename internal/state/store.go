@@ -68,6 +68,10 @@ func WriteStateWithContextAt(p Paths, iteration int, result contracts.RoundResul
 	return writeJSONFile(p.StateFile, runState)
 }
 
+func WriteRunState(p Paths, runState RunState) error {
+	return writeJSONFile(p.StateFile, runState)
+}
+
 func LoadRunState(p Paths) (RunState, error) {
 	data, err := os.ReadFile(p.StateFile)
 	if err != nil {

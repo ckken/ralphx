@@ -3,6 +3,7 @@ package hooks
 import (
 	"encoding/json"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -42,7 +43,27 @@ func PromptText(payload PromptSubmitPayload) string {
 	return ""
 }
 
+var stopPromptPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)^\s*(?:please\s+)?(?:stop|cancel|abort)\s*(?:now)?\s*[.!]?\s*$`),
+	regexp.MustCompile(`(?i)\b(?:stop|cancel|abort)\b`),
+	regexp.MustCompile(`(?i)^\s*(?:结束|停止)(?:当前)?(?:工作流|流程|会话)\s*[.!]?\s*$`),
+	regexp.MustCompile(`(?i)\b(?:stop|cancel|abort)\s+(?:the\s+)?(?:current|active|running)\s+(?:workflow|task|run|session|mode)\b`),
+	regexp.MustCompile(`(?i)\b(?:stop|cancel|abort)\s+(?:this|the)\s+(?:workflow|run|task|session|mode)\b`),
+}
+
 func PromptActivatesRalphx(text string) bool {
-	lower := strings.ToLower(text)
-	return strings.Contains(lower, "$ralphx") || strings.Contains(lower, " ralphx") || strings.HasPrefix(lower, "ralphx ")
+	return strings.TrimSpace(text) == "$ralphx"
+}
+
+func PromptStopsRalphx(text string) bool {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return false
+	}
+	for _, pattern := range stopPromptPatterns {
+		if pattern.MatchString(trimmed) {
+			return true
+		}
+	}
+	return false
 }

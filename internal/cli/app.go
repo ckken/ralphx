@@ -18,6 +18,8 @@ import (
 	"github.com/ckken/ralphx/internal/plan"
 	"github.com/ckken/ralphx/internal/runner"
 	"github.com/ckken/ralphx/internal/skill"
+	"github.com/ckken/ralphx/internal/state"
+	"github.com/ckken/ralphx/internal/subagents"
 	"github.com/ckken/ralphx/internal/version"
 )
 
@@ -38,7 +40,7 @@ func Main(args []string) int {
 	case "current":
 		return current.Main(os.Stdout)
 	case "doctor":
-		return doctor.Run(os.Stdout)
+		return doctor.Main(rest)
 	case "hook":
 		return hookMain(rest)
 	case "plan":
@@ -47,6 +49,8 @@ func Main(args []string) int {
 		return replanMain(rest)
 	case "skill":
 		return skillMain(rest)
+	case "agents":
+		return agentsMain(rest)
 	case "run":
 		return run(rest)
 	default:
@@ -84,7 +88,7 @@ func normalizeCommand(args []string) (string, []string) {
 	}
 	first := args[0]
 	switch first {
-	case "run", "doctor", "version", "current", "hook", "plan", "replan", "skill", "help", "-h", "--help":
+	case "run", "doctor", "version", "current", "hook", "plan", "replan", "skill", "agents", "help", "-h", "--help":
 		return first, args[1:]
 	default:
 		if strings.HasPrefix(first, "-") {
@@ -100,10 +104,13 @@ func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  ralphx run --task FILE [--checklist FILE] [--workdir DIR] [--resume] [--session-expiry DURATION]")
 	fmt.Println("  ralphx doctor")
+	fmt.Println("  ralphx hook native --event Stop|UserPromptSubmit [--payload FILE] [--task FILE]")
 	fmt.Println("  ralphx hook stop-guard --task FILE [--checklist FILE]")
 	fmt.Println("  ralphx plan --goal TEXT --out FILE [--execute]")
 	fmt.Println("  ralphx replan --task FILE [--execute]")
 	fmt.Println("  ralphx skill install [--project]")
+	fmt.Println("  ralphx agents list|discover [--json]")
+	fmt.Println("  ralphx agents install [NAME...] [--project] [--json]")
 	fmt.Println("  ralphx version")
 	fmt.Println("  ralphx current")
 	fmt.Println()
@@ -130,6 +137,26 @@ func skillMain(args []string) int {
 	}
 }
 
+func agentsMain(args []string) int {
+	if len(args) == 0 {
+		return agentsList(nil)
+	}
+
+	switch args[0] {
+	case "help", "-h", "--help":
+		printAgentsUsage()
+		return 0
+	case "list", "discover":
+		return agentsList(args[1:])
+	case "install":
+		return agentsInstall(args[1:])
+	default:
+		fmt.Fprintf(os.Stderr, "unknown agents command: %s\n\n", args[0])
+		printAgentsUsage()
+		return 1
+	}
+}
+
 func hookMain(args []string) int {
 	if len(args) == 0 {
 		printHookUsage()
@@ -145,6 +172,8 @@ func hookMain(args []string) int {
 		return hookStatus(args[1:])
 	case "uninstall":
 		return hookUninstall(args[1:])
+	case "native":
+		return hookNative(args[1:])
 	case "prompt-submit":
 		return hookPromptSubmit(args[1:])
 	case "stop-guard":
@@ -154,6 +183,59 @@ func hookMain(args []string) int {
 		printHookUsage()
 		return 1
 	}
+}
+
+func hookNative(args []string) int {
+	fs := flag.NewFlagSet("hook native", flag.ContinueOnError)
+	fs.SetOutput(os.Stdout)
+	event := fs.String("event", "", "Native hook event name")
+	taskPath := fs.String("task", "", "Task markdown file")
+	checklistPath := fs.String("checklist", "", "Checklist markdown file")
+	workdir := fs.String("workdir", envOr("WORKDIR", mustGetwd()), "Working directory")
+	stateDir := fs.String("state-dir", "", "Override state directory (default <workdir>/.ralphx)")
+	summaryPath := fs.String("summary", "", "Summary file")
+	statePath := fs.String("state-path", "", "Run state file")
+	lastResultPath := fs.String("last-result", "", "Last result file")
+	payloadPath := fs.String("payload", "", "Path to a JSON payload file")
+	testsRequired := fs.Bool("tests-required", false, "Require passing verification before allowing stop")
+	testsPassed := fs.Bool("tests-passed", false, "Indicate the latest verification passed")
+	jsonOut := fs.Bool("json", true, "Print JSON output")
+	nativeJSON := fs.Bool("native-json", false, "Emit native Codex Stop-hook JSON shape")
+	help := fs.Bool("help", false, "Show help")
+	if err := fs.Parse(args); err != nil {
+		fmt.Fprintf(os.Stderr, "hook native argument error: %v\n", err)
+		return 2
+	}
+	if *help {
+		printHookUsage()
+		return 0
+	}
+	nativeEvent, ok := hooks.NormalizeNativeHookEvent(*event)
+	if !ok {
+		fmt.Fprintf(os.Stderr, "hook native argument error: unsupported event %q\n", *event)
+		return 2
+	}
+	guardStateDir := resolveHookStateDir(*workdir, *stateDir)
+	paths := statePathsForHook(*workdir, guardStateDir)
+	resp, err := hooks.DispatchNativeHook(hooks.NativeHookRequest{
+		Event:          nativeEvent,
+		Workdir:        *workdir,
+		StateDir:       guardStateDir,
+		PayloadPath:    *payloadPath,
+		TaskPath:       *taskPath,
+		ChecklistPath:  *checklistPath,
+		SummaryPath:    firstNonEmpty(strings.TrimSpace(*summaryPath), paths.summaryPath),
+		StatePath:      firstNonEmpty(strings.TrimSpace(*statePath), paths.statePath),
+		LastResultPath: firstNonEmpty(strings.TrimSpace(*lastResultPath), paths.lastResultPath),
+		TestsRequired:  *testsRequired,
+		TestsPassedNow: *testsPassed,
+		NativeJSON:     *nativeJSON,
+	})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	return emitNativeHookResponse(resp, *jsonOut)
 }
 
 func hookStopGuard(args []string) int {
@@ -176,111 +258,26 @@ func hookStopGuard(args []string) int {
 		printHookUsage()
 		return 0
 	}
-	guardStateDir := *stateDir
-	if strings.TrimSpace(guardStateDir) == "" {
-		guardStateDir = filepath.Join(*workdir, ".ralphx")
-	}
+	guardStateDir := resolveHookStateDir(*workdir, *stateDir)
 	paths := statePathsForHook(*workdir, guardStateDir)
-	input, err := hooks.LoadStopGuardInput(*taskPath, *checklistPath, paths.summaryPath, paths.statePath, paths.lastResultPath, *testsRequired, *testsPassed)
+	resp, err := hooks.DispatchNativeHook(hooks.NativeHookRequest{
+		Event:          hooks.NativeHookEventStop,
+		Workdir:        *workdir,
+		StateDir:       guardStateDir,
+		TaskPath:       *taskPath,
+		ChecklistPath:  *checklistPath,
+		SummaryPath:    paths.summaryPath,
+		StatePath:      paths.statePath,
+		LastResultPath: paths.lastResultPath,
+		TestsRequired:  *testsRequired,
+		TestsPassedNow: *testsPassed,
+		NativeJSON:     *nativeJSON,
+	})
 	if err != nil {
-		if err == hooks.ErrNoTaskContext {
-			decision := hooks.Decision{
-				Allow:   true,
-				Reason:  "no_task_context",
-				Message: "No ralphx task context found in the current workspace; skipping stop guard.",
-			}
-			hookLogDir := filepath.Join(guardStateDir, "logs")
-			_ = hooks.AppendLog(hookLogDir, hooks.LogEntry{
-				Event:    hooks.EventStop,
-				Decision: decision,
-				Result:   map[string]any{"workdir": *workdir},
-			})
-			_ = hooks.AppendUserLog(hooks.LogEntry{
-				Event:    hooks.EventStop,
-				Decision: decision,
-				Result:   map[string]any{"workdir": *workdir},
-			})
-			fmt.Fprintf(os.Stderr, "[hook stop-guard] allow: %s\n", decision.Message)
-			if *nativeJSON {
-				fmt.Fprintln(os.Stdout, "{}")
-			} else if *jsonOut {
-				enc := json.NewEncoder(os.Stdout)
-				enc.SetIndent("", "  ")
-				_ = enc.Encode(decision)
-			} else {
-				fmt.Fprintln(os.Stdout, "allow")
-			}
-			return 0
-		}
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	decision := hooks.EvaluateStopGuard(hooks.GuardConfig{
-		Enabled:                   true,
-		BlockWhenChecklistOpen:    true,
-		BlockWhenVerificationMiss: true,
-		BlockWhenIncomplete:       true,
-	}, input)
-	hookLogDir := filepath.Join(guardStateDir, "logs")
-	_ = hooks.AppendLog(hookLogDir, hooks.LogEntry{
-		Event:         hooks.EventStop,
-		TaskPath:      *taskPath,
-		ChecklistPath: *checklistPath,
-		Decision:      decision,
-		Result:        input.Result,
-	})
-	_ = hooks.WriteLatest(filepath.Join(guardStateDir, "last-hook-event.json"), hooks.LogEntry{
-		Event:         hooks.EventStop,
-		TaskPath:      *taskPath,
-		ChecklistPath: *checklistPath,
-		Decision:      decision,
-		Result:        input.Result,
-	})
-	_ = hooks.AppendUserLog(hooks.LogEntry{
-		Event:         hooks.EventStop,
-		TaskPath:      *taskPath,
-		ChecklistPath: *checklistPath,
-		Decision:      decision,
-		Result:        input.Result,
-	})
-	_ = hooks.WriteUserLatest(hooks.LogEntry{
-		Event:         hooks.EventStop,
-		TaskPath:      *taskPath,
-		ChecklistPath: *checklistPath,
-		Decision:      decision,
-		Result:        input.Result,
-	})
-	if decision.Allow {
-		fmt.Fprintf(os.Stderr, "[hook stop-guard] allow: %s\n", firstNonEmpty(decision.Message, "stop allowed"))
-	} else {
-		fmt.Fprintf(os.Stderr, "[hook stop-guard] block (%s): %s\n", decision.Reason, decision.Message)
-	}
-	if *nativeJSON {
-		if decision.Allow {
-			fmt.Fprintln(os.Stdout, "{}")
-		} else {
-			enc := json.NewEncoder(os.Stdout)
-			enc.SetIndent("", "  ")
-			_ = enc.Encode(map[string]any{
-				"decision":      "block",
-				"reason":        decision.Message,
-				"stopReason":    decision.Reason,
-				"systemMessage": decision.Message,
-			})
-		}
-	} else if *jsonOut {
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-		_ = enc.Encode(decision)
-	} else if decision.Allow {
-		fmt.Fprintln(os.Stdout, "allow")
-	} else {
-		fmt.Fprintf(os.Stdout, "block: %s - %s\n", decision.Reason, decision.Message)
-	}
-	if decision.Allow {
-		return 0
-	}
-	return 3
+	return emitNativeHookResponse(resp, *jsonOut)
 }
 
 func hookPromptSubmit(args []string) int {
@@ -299,91 +296,38 @@ func hookPromptSubmit(args []string) int {
 		printHookUsage()
 		return 0
 	}
-	payload, err := hooks.LoadPromptSubmitPayload(*payloadPath)
+	resp, err := hooks.DispatchNativeHook(hooks.NativeHookRequest{
+		Event:       hooks.NativeHookEventUserPromptSubmit,
+		Workdir:     *workdir,
+		StateDir:    *stateDir,
+		PayloadPath: *payloadPath,
+	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	text := hooks.PromptText(payload)
-	active := hooks.PromptActivatesRalphx(text)
-	effectiveWorkdir := strings.TrimSpace(*workdir)
-	if effectiveWorkdir == "" {
-		effectiveWorkdir = strings.TrimSpace(payload.Cwd)
+	return emitNativeHookResponse(resp, *jsonOut)
+}
+
+func emitNativeHookResponse(resp hooks.NativeHookResponse, jsonOut bool) int {
+	if resp.Silent {
+		return resp.ExitCode
 	}
-	if effectiveWorkdir == "" {
-		effectiveWorkdir = mustGetwd()
+	if resp.Stderr != "" {
+		fmt.Fprintln(os.Stderr, resp.Stderr)
 	}
-	guardStateDir := *stateDir
-	if strings.TrimSpace(guardStateDir) == "" {
-		guardStateDir = filepath.Join(effectiveWorkdir, ".ralphx")
-	}
-	hookLogDir := filepath.Join(guardStateDir, "logs")
-	decision := hooks.Decision{
-		Allow:   true,
-		Reason:  "prompt_submit",
-		Message: "ralphx inactive",
-	}
-	if active {
-		decision.Message = "ralphx mode active"
-	}
-	_ = hooks.AppendLog(hookLogDir, hooks.LogEntry{
-		Event:    hooks.EventPromptSubmit,
-		TaskPath: "",
-		Decision: decision,
-		Result: map[string]any{
-			"active":  active,
-			"text":    text,
-			"workdir": effectiveWorkdir,
-		},
-	})
-	_ = hooks.WriteLatest(filepath.Join(guardStateDir, "last-hook-event.json"), hooks.LogEntry{
-		Event:    hooks.EventPromptSubmit,
-		TaskPath: "",
-		Decision: decision,
-		Result: map[string]any{
-			"active":  active,
-			"text":    text,
-			"workdir": effectiveWorkdir,
-		},
-	})
-	_ = hooks.AppendUserLog(hooks.LogEntry{
-		Event:    hooks.EventPromptSubmit,
-		TaskPath: "",
-		Decision: decision,
-		Result: map[string]any{
-			"active":  active,
-			"text":    text,
-			"workdir": effectiveWorkdir,
-		},
-	})
-	_ = hooks.WriteUserLatest(hooks.LogEntry{
-		Event:    hooks.EventPromptSubmit,
-		TaskPath: "",
-		Decision: decision,
-		Result: map[string]any{
-			"active":  active,
-			"text":    text,
-			"workdir": effectiveWorkdir,
-		},
-	})
-	if active {
-		fmt.Fprintln(os.Stderr, "[hook prompt-submit] ralphx mode active")
-	}
-	if *jsonOut {
+	if jsonOut {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
-		if active {
-			_ = enc.Encode(map[string]any{
-				"hookSpecificOutput": map[string]any{
-					"hookEventName":     "UserPromptSubmit",
-					"additionalContext": "ralphx workflow active. Continue the current branch of work; do not stop at advice alone. Execute one bounded next step or emit a concrete next-step plan.",
-				},
-			})
-		} else {
-			_ = enc.Encode(map[string]any{})
-		}
+		_ = enc.Encode(resp.Stdout)
+		return resp.ExitCode
 	}
-	return 0
+	if resp.Decision.Allow {
+		fmt.Fprintln(os.Stdout, "allow")
+	} else {
+		fmt.Fprintf(os.Stdout, "block: %s - %s\n", resp.Decision.Reason, resp.Decision.Message)
+	}
+	return resp.ExitCode
 }
 
 func hookStatus(args []string) int {
@@ -404,11 +348,23 @@ func hookStatus(args []string) int {
 	if strings.TrimSpace(root) == "" {
 		root = filepath.Join(*workdir, ".ralphx")
 	}
+	runState, runStateErr := state.LoadRunState(state.DerivePaths(*workdir, root))
 	repoLatest, repoErr := hooks.ReadLatest(filepath.Join(root, "last-hook-event.json"))
+	activeState, activeErr := hooks.ReadActiveState(root)
 	userLatest, userErr := hooks.ReadLatest(filepath.Join(os.Getenv("HOME"), ".codex", "log", "ralphx-last-hook-event.json"))
+	installStatus, installErr := hooks.ReadUserHookInstallStatus()
 	out := map[string]any{}
+	if installErr == nil && installStatus.HooksFileFound {
+		out["installed"] = installStatus
+	}
+	if runStateErr == nil {
+		out["state"] = runState
+	}
 	if repoErr == nil {
 		out["repo"] = repoLatest
+	}
+	if activeErr == nil {
+		out["active"] = activeState
 	}
 	if userErr == nil {
 		out["user"] = userLatest
@@ -417,6 +373,7 @@ func hookStatus(args []string) int {
 		fmt.Fprintln(os.Stderr, "no hook status found")
 		return 1
 	}
+	fmt.Fprintln(os.Stderr, hookStatusSummary(out))
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	_ = enc.Encode(out)
@@ -538,21 +495,7 @@ func planMain(args []string) int {
 		return 0
 	}
 
-	cfg := config.RunConfig{
-		TaskFile:      taskPath,
-		ChecklistFile: checklistPath,
-		Workdir:       *workdir,
-		TestsCmd:      firstNonEmpty(strings.TrimSpace(*testsCmd), strings.TrimSpace(outcome.TestsCmd)),
-		CodexCmd:      *codexBin,
-		CodexArgs:     splitArgs(*codexArgs),
-		StateDir:      planStateDir,
-		Workers:       envInt("RALPHX_WORKERS", 1),
-		MaxIterations: envInt("MAX_ITERATIONS", 30),
-		MaxNoProgress: envInt("MAX_NO_PROGRESS", 3),
-		RoundTimeout:  envDurationSeconds("ROUND_TIMEOUT_SECONDS", 1800),
-		ResumeSession: envBool("RALPHX_RESUME_SESSION", false),
-		SessionExpiry: envDurationHours("SESSION_EXPIRY_HOURS", 24),
-	}
+	cfg := executionConfig(taskPath, checklistPath, *workdir, planStateDir, firstNonEmpty(strings.TrimSpace(*testsCmd), strings.TrimSpace(outcome.TestsCmd)), *codexBin, splitArgs(*codexArgs))
 	if err := runner.New(cfg).Run(context.Background()); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
@@ -635,21 +578,7 @@ func replanMain(args []string) int {
 		return 0
 	}
 
-	cfg := config.RunConfig{
-		TaskFile:      taskFile,
-		ChecklistFile: checklistFile,
-		Workdir:       *workdir,
-		TestsCmd:      firstNonEmpty(strings.TrimSpace(*testsCmd), strings.TrimSpace(outcome.TestsCmd)),
-		CodexCmd:      *codexBin,
-		CodexArgs:     splitArgs(*codexArgs),
-		StateDir:      replanStateDir,
-		Workers:       envInt("RALPHX_WORKERS", 1),
-		MaxIterations: envInt("MAX_ITERATIONS", 30),
-		MaxNoProgress: envInt("MAX_NO_PROGRESS", 3),
-		RoundTimeout:  envDurationSeconds("ROUND_TIMEOUT_SECONDS", 1800),
-		ResumeSession: envBool("RALPHX_RESUME_SESSION", false),
-		SessionExpiry: envDurationHours("SESSION_EXPIRY_HOURS", 24),
-	}
+	cfg := executionConfig(taskFile, checklistFile, *workdir, replanStateDir, firstNonEmpty(strings.TrimSpace(*testsCmd), strings.TrimSpace(outcome.TestsCmd)), *codexBin, splitArgs(*codexArgs))
 	if err := runner.New(cfg).Run(context.Background()); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
@@ -685,6 +614,94 @@ func skillInstall(args []string) int {
 	return 0
 }
 
+func executionConfig(taskFile, checklistFile, workdir, stateDir, testsCmd, codexBin string, codexArgs []string) config.RunConfig {
+	return config.RunConfig{
+		TaskFile:      taskFile,
+		ChecklistFile: checklistFile,
+		Workdir:       workdir,
+		TestsCmd:      testsCmd,
+		CodexCmd:      codexBin,
+		CodexArgs:     codexArgs,
+		StateDir:      stateDir,
+		Workers:       envInt("RALPHX_WORKERS", 1),
+		MaxIterations: envInt("MAX_ITERATIONS", 30),
+		MaxNoProgress: envInt("MAX_NO_PROGRESS", 3),
+		RoundTimeout:  envDurationSeconds("ROUND_TIMEOUT_SECONDS", 1800),
+		ResumeSession: envBool("RALPHX_RESUME_SESSION", false),
+		SessionExpiry: envDurationHours("SESSION_EXPIRY_HOURS", 24),
+		AutoReplan:    envBool("RALPHX_AUTO_REPLAN", true),
+	}
+}
+
+func agentsList(args []string) int {
+	fs := flag.NewFlagSet("agents list", flag.ContinueOnError)
+	fs.SetOutput(os.Stdout)
+	workdir := fs.String("workdir", envOr("WORKDIR", mustGetwd()), "Working directory")
+	jsonOut := fs.Bool("json", false, "Print JSON output")
+	help := fs.Bool("help", false, "Show help")
+	if err := fs.Parse(args); err != nil {
+		fmt.Fprintf(os.Stderr, "agents list argument error: %v\n", err)
+		return 2
+	}
+	if *help {
+		printAgentsUsage()
+		return 0
+	}
+	discovery, err := subagents.Discover(*workdir)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if *jsonOut {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(discovery)
+		return 0
+	}
+	printAgentsDiscovery(os.Stdout, discovery)
+	return 0
+}
+
+func agentsInstall(args []string) int {
+	fs := flag.NewFlagSet("agents install", flag.ContinueOnError)
+	fs.SetOutput(os.Stdout)
+	workdir := fs.String("workdir", envOr("WORKDIR", mustGetwd()), "Working directory")
+	project := fs.Bool("project", false, "Install to the current repo ./.codex/agents directory")
+	jsonOut := fs.Bool("json", false, "Print JSON output")
+	help := fs.Bool("help", false, "Show help")
+	if err := fs.Parse(args); err != nil {
+		fmt.Fprintf(os.Stderr, "agents install argument error: %v\n", err)
+		return 2
+	}
+	if *help {
+		printAgentsUsage()
+		return 0
+	}
+	result, err := subagents.Install(*workdir, *project, fs.Args())
+	if err != nil {
+		if *jsonOut {
+			enc := json.NewEncoder(os.Stdout)
+			enc.SetIndent("", "  ")
+			_ = enc.Encode(map[string]any{
+				"ok":     false,
+				"error":  err.Error(),
+				"result": result,
+			})
+		} else {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		return 1
+	}
+	if *jsonOut {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(result)
+		return 0
+	}
+	printAgentsInstall(os.Stdout, result)
+	return 0
+}
+
 func printSkillUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  ralphx skill install [--project]")
@@ -692,6 +709,53 @@ func printSkillUsage() {
 	fmt.Println("Defaults:")
 	fmt.Println("  Without --project, installs to ~/.codex/skills/ralphx")
 	fmt.Println("  With --project, installs to ./.codex/skills/ralphx")
+}
+
+func printAgentsUsage() {
+	fmt.Println("Usage:")
+	fmt.Println("  ralphx agents list|discover [--workdir DIR] [--json]")
+	fmt.Println("  ralphx agents install [NAME...] [--workdir DIR] [--project] [--json]")
+	fmt.Println()
+	fmt.Println("Defaults:")
+	fmt.Println("  list/discover scans the curated catalog plus the current global and project agent dirs")
+	fmt.Println("  install with no names installs the curated set")
+	fmt.Println("  --project writes to ./.codex/agents instead of ~/.codex/agents")
+}
+
+func printAgentsDiscovery(w *os.File, d subagents.Discovery) {
+	fmt.Fprintf(w, "ralphx agents discover\n")
+	fmt.Fprintf(w, "workdir: %s\n", d.Workdir)
+	fmt.Fprintf(w, "global: %s\n", d.GlobalDir)
+	fmt.Fprintf(w, "project: %s\n\n", d.ProjectDir)
+	for _, status := range d.Catalog {
+		state := "missing"
+		if status.Installed {
+			state = "installed"
+		}
+		fmt.Fprintf(w, "- %s [%s] %s\n", status.Spec.Name, state, status.Spec.Description)
+		for _, loc := range status.Locations {
+			fmt.Fprintf(w, "  %s: %s\n", loc.Scope, loc.Path)
+		}
+	}
+	if len(d.Unknown) > 0 {
+		fmt.Fprintln(w, "\nunknown installed agents:")
+		for _, item := range d.Unknown {
+			fmt.Fprintf(w, "- %s\n", item.Name)
+			for _, loc := range item.Locations {
+				fmt.Fprintf(w, "  %s: %s\n", loc.Scope, loc.Path)
+			}
+		}
+	}
+}
+
+func printAgentsInstall(w *os.File, r subagents.InstallResult) {
+	fmt.Fprintf(w, "installed subagents to %s (%s)\n", r.TargetDir, r.Scope)
+	for _, loc := range r.Installed {
+		fmt.Fprintf(w, "- %s\n", loc.Path)
+	}
+	if len(r.Missing) > 0 {
+		fmt.Fprintf(w, "missing: %s\n", strings.Join(r.Missing, ", "))
+	}
 }
 
 func printPlanUsage() {
@@ -714,6 +778,7 @@ func printReplanUsage() {
 
 func printHookUsage() {
 	fmt.Println("Usage:")
+	fmt.Println("  ralphx hook native --event Stop|UserPromptSubmit [--payload FILE] [--task FILE]")
 	fmt.Println("  ralphx hook stop-guard --task FILE [--checklist FILE]")
 	fmt.Println("  ralphx hook prompt-submit [--payload FILE]")
 	fmt.Println("  ralphx hook install")
@@ -723,6 +788,60 @@ func printHookUsage() {
 	fmt.Println("Examples:")
 	fmt.Println("  ralphx hook stop-guard --task tasks/demo.md --checklist tasks/demo.checklist.md")
 	fmt.Println("  ralphx hook stop-guard --task tasks/demo.md --tests-required --tests-passed")
+}
+
+func resolveHookStateDir(workdir, stateDir string) string {
+	if strings.TrimSpace(stateDir) != "" {
+		return stateDir
+	}
+	if strings.TrimSpace(workdir) != "" {
+		return filepath.Join(workdir, ".ralphx")
+	}
+	return ".ralphx"
+}
+
+func hookStatusSummary(out map[string]any) string {
+	parts := make([]string, 0, 3)
+	switch active := out["active"].(type) {
+	case hooks.ActiveState:
+		parts = append(parts, "active="+summaryBool(active.Active))
+		if mode := strings.TrimSpace(active.Mode); mode != "" {
+			parts = append(parts, "mode="+mode)
+		}
+	case map[string]any:
+		parts = append(parts, "active="+summaryBool(active["active"]))
+		if mode, ok := active["mode"].(string); ok && strings.TrimSpace(mode) != "" {
+			parts = append(parts, "mode="+mode)
+		}
+	}
+	if installed, ok := out["installed"].(hooks.InstallStatus); ok {
+		parts = append(parts, "installed="+summaryBool(installed.ManagedInstalled))
+		parts = append(parts, "stopHook="+summaryBool(installed.StopInstalled))
+		parts = append(parts, "promptHook="+summaryBool(installed.PromptInstalled))
+	}
+	if repo, ok := out["repo"].(hooks.LogEntry); ok {
+		parts = append(parts, "repo="+string(repo.Event))
+		parts = append(parts, "repoReason="+repo.Decision.Reason)
+	}
+	if user, ok := out["user"].(hooks.LogEntry); ok {
+		parts = append(parts, "user="+string(user.Event))
+		parts = append(parts, "userReason="+user.Decision.Reason)
+	}
+	if runState, ok := out["state"].(state.RunState); ok && runState.Hook != nil {
+		parts = append(parts, "stateHook="+runState.Hook.Event)
+		parts = append(parts, "stateReason="+runState.Hook.Reason)
+	}
+	if len(parts) == 0 {
+		return "[hook status] no details"
+	}
+	return "[hook status] " + strings.Join(parts, " ")
+}
+
+func summaryBool(v any) string {
+	if b, ok := v.(bool); ok && b {
+		return "true"
+	}
+	return "false"
 }
 
 type hookStatePaths struct {
